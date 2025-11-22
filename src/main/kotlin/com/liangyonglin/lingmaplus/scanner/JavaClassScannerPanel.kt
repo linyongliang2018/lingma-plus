@@ -4,6 +4,8 @@ import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ProjectFileIndex
+import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.*
@@ -24,30 +26,33 @@ import javax.swing.table.DefaultTableModel
  */
 class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout()) {
     
-    private data class ClassInfo(
+    private class ClassInfo(
         val className: String,
         val filePath: String,
         val methodCount: Int,
         val psiClass: PsiClass,
-        val virtualFile: VirtualFile?
+        val virtualFile: VirtualFile?,
+        var navigateCount: Int = 0,
+        val fileSource: FileSource = FileSource.PROJECT
     )
     
     private val logger = thisLogger()
     private val scanButton = JButton("开始扫描")
     private val progressBar = JProgressBar()
     private val statusLabel = JLabel("准备就绪")
-    private val tableModel = DefaultTableModel(arrayOf("类名", "方法数", "文件路径"), 0)
+    private val tableModel = DefaultTableModel(arrayOf("跳转次数", "类名", "方法数", "文件路径"), 0)
     private val table = JBTable(tableModel)
     private val pageInfoLabel = JLabel("")
     private val prevButton = JButton("上一页")
     private val nextButton = JButton("下一页")
     
-    private var allClasses: List<ClassInfo> = emptyList()
+    private var allClasses: MutableList<ClassInfo> = mutableListOf()
     private var currentPage = 0
     private val pageSize = 20
     
     init {
         setupUI()
+        loadCache()
     }
     
     private fun setupUI() {
@@ -71,9 +76,10 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
         
         // 设置列宽
         val columnModel = table.columnModel
-        columnModel.getColumn(0).preferredWidth = 300  // 类名
-        columnModel.getColumn(1).preferredWidth = 80    // 方法数
-        columnModel.getColumn(2).preferredWidth = 500   // 文件路径
+        columnModel.getColumn(0).preferredWidth = 80    // 跳转次数
+        columnModel.getColumn(1).preferredWidth = 300    // 类名
+        columnModel.getColumn(2).preferredWidth = 80     // 方法数
+        columnModel.getColumn(3).preferredWidth = 500    // 文件路径
         
         // 添加右键菜单
         val popupMenu = JPopupMenu()
@@ -127,6 +133,12 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
     }
     
     fun startScan() {
+        // 清除缓存
+        val projectBasePath = project.basePath
+        ClassInfoCache.clearCache(projectBasePath)
+        allClasses.clear()
+        currentPage = 0
+        
         scanButton.isEnabled = false
         progressBar.isVisible = true
         progressBar.isIndeterminate = true
@@ -140,6 +152,8 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
     private fun scanJavaFiles() {
         try {
             val allJavaFiles = mutableListOf<PsiJavaFile>()
+            val fileIndex = ProjectRootManager.getInstance(project).fileIndex
+            val projectBasePath = project.basePath
             
             // 扫描项目文件和库文件
             val scope = GlobalSearchScope.allScope(project)
@@ -161,22 +175,40 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
             
             logger.info("成功解析 ${allJavaFiles.size} 个Java文件")
             
-            // 收集所有类信息
+            // 收集所有类信息，并分类文件来源
             val classesWithManyMethods = mutableListOf<ClassInfo>()
             
             for (psiFile in allJavaFiles) {
                 try {
+                    val virtualFile = psiFile.virtualFile ?: continue
+                    
+                    // 判断文件来源
+                    val fileSource = when {
+                        fileIndex.isInSourceContent(virtualFile) -> FileSource.PROJECT
+                        fileIndex.isInLibraryClasses(virtualFile) -> {
+                            // 判断是否是JDK
+                            val path = virtualFile.path.lowercase()
+                            if (path.contains("jdk") || path.contains("java\\lang") || 
+                                path.contains("java/lang") || path.contains("rt.jar")) {
+                                FileSource.JDK
+                            } else {
+                                FileSource.LIBRARY
+                            }
+                        }
+                        else -> FileSource.LIBRARY
+                    }
+                    
                     for (psiClass in psiFile.classes) {
                         val methods = psiClass.methods
                         if (methods.size > 20) {
-                            val virtualFile = psiFile.virtualFile
                             classesWithManyMethods.add(
                                 ClassInfo(
                                     className = psiClass.qualifiedName ?: psiClass.name ?: "Unknown",
-                                    filePath = virtualFile?.path ?: "Unknown",
+                                    filePath = virtualFile.path,
                                     methodCount = methods.size,
                                     psiClass = psiClass,
-                                    virtualFile = virtualFile
+                                    virtualFile = virtualFile,
+                                    fileSource = fileSource
                                 )
                             )
                         }
@@ -188,16 +220,45 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
             
             logger.info("找到 ${classesWithManyMethods.size} 个包含超过20个方法的类")
             
-            // 随机选择前100个
-            Collections.shuffle(classesWithManyMethods)
-            allClasses = classesWithManyMethods.take(100)
+            // 按文件来源排序：项目文件在前，然后是第三方库，最后是JDK
+            classesWithManyMethods.sortWith(compareBy<ClassInfo> { 
+                when (it.fileSource) {
+                    FileSource.PROJECT -> 0
+                    FileSource.LIBRARY -> 1
+                    FileSource.JDK -> 2
+                }
+            }.thenByDescending { it.methodCount })  // 同类型内按方法数降序
+            
+            // 随机选择前100个（但保持排序）
+            // 先分别随机选择各类别的类
+            val projectClasses = classesWithManyMethods.filter { it.fileSource == FileSource.PROJECT }
+            val libraryClasses = classesWithManyMethods.filter { it.fileSource == FileSource.LIBRARY }
+            val jdkClasses = classesWithManyMethods.filter { it.fileSource == FileSource.JDK }
+            
+            Collections.shuffle(projectClasses)
+            Collections.shuffle(libraryClasses)
+            Collections.shuffle(jdkClasses)
+            
+            // 优先选择项目文件，然后第三方库，最后JDK
+            val selectedClasses = mutableListOf<ClassInfo>()
+            selectedClasses.addAll(projectClasses.take(50))
+            selectedClasses.addAll(libraryClasses.take(30))
+            selectedClasses.addAll(jdkClasses.take(20))
+            
+            allClasses = selectedClasses.toMutableList()
+            
+            // 保存缓存
+            saveCache()
             
             // 更新UI
             com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
                 updateTable()
                 scanButton.isEnabled = true
                 progressBar.isVisible = false
-                statusLabel.text = "扫描完成: 找到 ${allClasses.size} 个类"
+                val projectCount = allClasses.count { it.fileSource == FileSource.PROJECT }
+                val libraryCount = allClasses.count { it.fileSource == FileSource.LIBRARY }
+                val jdkCount = allClasses.count { it.fileSource == FileSource.JDK }
+                statusLabel.text = "扫描完成: 项目($projectCount) 库($libraryCount) JDK($jdkCount)"
             }
             
         } catch (e: Exception) {
@@ -225,6 +286,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
             val pageClasses = allClasses.subList(startIndex, endIndex)
             for (classInfo in pageClasses) {
                 tableModel.addRow(arrayOf(
+                    classInfo.navigateCount,
                     classInfo.className,
                     classInfo.methodCount,
                     classInfo.filePath
@@ -263,6 +325,11 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
             if (actualIndex < allClasses.size) {
                 val classInfo = allClasses[actualIndex]
                 try {
+                    // 增加跳转次数
+                    classInfo.navigateCount++
+                    saveCache()
+                    updateTable()
+                    
                     // 直接使用保存的PsiClass进行导航
                     com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
                         try {
@@ -310,6 +377,104 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                     )
                 }
             }
+        }
+    }
+    
+    /**
+     * 加载缓存
+     */
+    private fun loadCache() {
+        try {
+            val projectBasePath = project.basePath
+            val cachedClasses = ClassInfoCache.loadCache(projectBasePath)
+            if (cachedClasses.isEmpty()) {
+                statusLabel.text = "准备就绪（无缓存数据）"
+                return
+            }
+            
+            // 将缓存数据转换为ClassInfo
+            val loadedClasses = mutableListOf<ClassInfo>()
+            for (cached in cachedClasses) {
+                // 尝试查找对应的PsiClass
+                val virtualFile = com.intellij.openapi.vfs.LocalFileSystem.getInstance()
+                    .findFileByPath(cached.filePath)
+                
+                val psiClass: PsiClass? = virtualFile?.let { vf ->
+                    try {
+                        val psiFile = PsiManager.getInstance(project).findFile(vf) as? PsiJavaFile
+                        psiFile?.classes?.find { 
+                            (it.qualifiedName ?: it.name) == cached.className 
+                        }
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+                
+                // 只加载能找到PsiClass的类（文件仍然存在且可访问）
+                if (psiClass != null && virtualFile != null) {
+                    val fileSource = try {
+                        FileSource.valueOf(cached.fileSource)
+                    } catch (e: Exception) {
+                        FileSource.PROJECT  // 兼容旧缓存
+                    }
+                    
+                    loadedClasses.add(
+                        ClassInfo(
+                            className = cached.className,
+                            filePath = cached.filePath,
+                            methodCount = cached.methodCount,
+                            psiClass = psiClass,
+                            virtualFile = virtualFile,
+                            navigateCount = cached.navigateCount,
+                            fileSource = fileSource
+                        )
+                    )
+                }
+            }
+            
+            // 按文件来源排序
+            loadedClasses.sortWith(compareBy<ClassInfo> { 
+                when (it.fileSource) {
+                    FileSource.PROJECT -> 0
+                    FileSource.LIBRARY -> 1
+                    FileSource.JDK -> 2
+                }
+            }.thenByDescending { it.methodCount })
+            
+            allClasses = loadedClasses
+            if (allClasses.isNotEmpty()) {
+                updateTable()
+                val projectCount = allClasses.count { it.fileSource == FileSource.PROJECT }
+                val libraryCount = allClasses.count { it.fileSource == FileSource.LIBRARY }
+                val jdkCount = allClasses.count { it.fileSource == FileSource.JDK }
+                statusLabel.text = "已加载缓存: 项目($projectCount) 库($libraryCount) JDK($jdkCount)"
+            } else {
+                statusLabel.text = "准备就绪（缓存数据已失效）"
+            }
+        } catch (e: Exception) {
+            logger.error("加载缓存失败", e)
+            statusLabel.text = "加载缓存失败"
+        }
+    }
+    
+    /**
+     * 保存缓存
+     */
+    private fun saveCache() {
+        try {
+            val projectBasePath = project.basePath
+            val cachedClasses = allClasses.map { classInfo ->
+                CachedClassInfo(
+                    className = classInfo.className,
+                    filePath = classInfo.filePath,
+                    methodCount = classInfo.methodCount,
+                    navigateCount = classInfo.navigateCount,
+                    fileSource = classInfo.fileSource.name
+                )
+            }
+            ClassInfoCache.saveCache(cachedClasses, projectBasePath)
+        } catch (e: Exception) {
+            logger.error("保存缓存失败", e)
         }
     }
 }
