@@ -4,7 +4,6 @@ import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.*
@@ -64,7 +63,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
         progressBar.isVisible = false
         
         // 表格设置
-        table.selectionMode = ListSelectionModel.SINGLE_SELECTION
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
         table.setShowGrid(true)
         table.autoResizeMode = JTable.AUTO_RESIZE_LAST_COLUMN
         table.setColumnSelectionAllowed(false)
@@ -76,11 +75,33 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
         columnModel.getColumn(1).preferredWidth = 80    // 方法数
         columnModel.getColumn(2).preferredWidth = 500   // 文件路径
         
-        // 添加双击事件，导航到类
+        // 添加右键菜单
+        val popupMenu = JPopupMenu()
+        val navigateMenuItem = JMenuItem("导航到类")
+        navigateMenuItem.addActionListener { navigateToClass() }
+        popupMenu.add(navigateMenuItem)
+        
         table.addMouseListener(object : MouseAdapter() {
-            override fun mouseClicked(e: MouseEvent) {
-                if (e.clickCount == 2) {
-                    navigateToClass()
+            override fun mousePressed(e: MouseEvent) {
+                showPopupMenu(e)
+            }
+            
+            override fun mouseReleased(e: MouseEvent) {
+                showPopupMenu(e)
+            }
+            
+            private fun showPopupMenu(e: MouseEvent) {
+                if (e.isPopupTrigger) {
+                    val row = table.rowAtPoint(e.point)
+                    if (row >= 0 && !table.isRowSelected(row)) {
+                        table.setRowSelectionInterval(row, row)
+                    }
+                    if (table.selectedRow >= 0) {
+                        navigateMenuItem.isEnabled = true
+                        popupMenu.show(table, e.x, e.y)
+                    } else {
+                        navigateMenuItem.isEnabled = false
+                    }
                 }
             }
         })
@@ -256,8 +277,10 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                                 classInfo.psiClass.navigate(true)
                             } else {
                                 // 如果PsiClass无效，尝试重新查找
-                                val psiFile = PsiManager.getInstance(project)
-                                    .findFile(classInfo.virtualFile) as? PsiJavaFile
+                                val psiFile = classInfo.virtualFile?.let {
+                                    PsiManager.getInstance(project)
+                                        .findFile(it) as? PsiJavaFile
+                                }
                                 
                                 if (psiFile != null) {
                                     val targetClass = psiFile.classes.find { 
