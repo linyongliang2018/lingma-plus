@@ -1,4 +1,4 @@
-package com.liangyonglin.lingmaplus
+package com.liangyonglin.lingmaplus.lingma
 
 import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.ActionManager
@@ -12,7 +12,6 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.psi.PsiJavaFile
-import com.intellij.psi.PsiMethod
 import java.util.Collections
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit

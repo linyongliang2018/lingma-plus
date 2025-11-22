@@ -1,4 +1,4 @@
-package com.liangyonglin.lingmaplus
+package com.liangyonglin.lingmaplus.lingma
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper

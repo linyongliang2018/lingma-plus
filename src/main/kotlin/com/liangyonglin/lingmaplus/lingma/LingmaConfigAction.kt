@@ -1,4 +1,4 @@
-package com.liangyonglin.lingmaplus
+package com.liangyonglin.lingmaplus.lingma
 
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent

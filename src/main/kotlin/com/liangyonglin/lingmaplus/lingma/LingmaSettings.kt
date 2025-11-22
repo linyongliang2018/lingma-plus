@@ -1,4 +1,4 @@
-package com.liangyonglin.lingmaplus
+package com.liangyonglin.lingmaplus.lingma
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.*

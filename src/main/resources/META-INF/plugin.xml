@@ -15,7 +15,7 @@
 
     <actions>
         <action id="com.liangyonglin.lingmaplus.PopupDialogAction" 
-                class="com.liangyonglin.lingmaplus.PopupDialogAction"
+                class="com.liangyonglin.lingmaplus.lingma.PopupDialogAction"
                 text="LingmaHelper"
                 description="Batch explain all methods in the current class using Lingma">
             <add-to-group group-id="ToolsMenu" anchor="first"/>
@@ -23,11 +23,24 @@
             <override-text place="MainMenu" text="LingmaHelper"/>
         </action>
         <action id="com.liangyonglin.lingmaplus.LingmaConfigAction" 
-                class="com.liangyonglin.lingmaplus.LingmaConfigAction"
+                class="com.liangyonglin.lingmaplus.lingma.LingmaConfigAction"
                 text="LingmaHelper 配置"
                 description="配置 LingmaHelper 的时间间隔">
             <add-to-group group-id="ToolsMenu" anchor="after" relative-to-action="com.liangyonglin.lingmaplus.PopupDialogAction"/>
         </action>
+        <action id="com.liangyonglin.lingmaplus.ScanJavaFilesAction" 
+                class="com.liangyonglin.lingmaplus.scanner.ScanJavaFilesAction"
+                text="扫描Java类（方法数>20）"
+                description="扫描项目文件和库文件，找出方法数超过20的Java类">
+            <add-to-group group-id="ToolsMenu" anchor="after" relative-to-action="com.liangyonglin.lingmaplus.LingmaConfigAction"/>
+        </action>
     </actions>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="JavaClassScanner" 
+                    secondary="false" 
+                    anchor="right" 
+                    factoryClass="com.liangyonglin.lingmaplus.scanner.JavaClassScannerToolWindow"/>
+    </extensions>
 
 </idea-plugin>
