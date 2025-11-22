@@ -1,0 +1,33 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
+    <id>com.liangyonglin.lingma-plus</id>
+
+    <!-- Public plugin name should be written in Title Case. -->
+    <name>Lingma-Plus</name>
+
+    <!-- Product and plugin compatibility requirements -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.java</depends>
+
+    <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
+    <vendor>liangyonglin</vendor>
+
+    <actions>
+        <action id="com.liangyonglin.lingmaplus.PopupDialogAction" 
+                class="com.liangyonglin.lingmaplus.PopupDialogAction"
+                text="LingmaHelper"
+                description="Batch explain all methods in the current class using Lingma">
+            <add-to-group group-id="ToolsMenu" anchor="first"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
+            <override-text place="MainMenu" text="LingmaHelper"/>
+        </action>
+        <action id="com.liangyonglin.lingmaplus.LingmaConfigAction" 
+                class="com.liangyonglin.lingmaplus.LingmaConfigAction"
+                text="LingmaHelper 配置"
+                description="配置 LingmaHelper 的时间间隔">
+            <add-to-group group-id="ToolsMenu" anchor="after" relative-to-action="com.liangyonglin.lingmaplus.PopupDialogAction"/>
+        </action>
+    </actions>
+
+</idea-plugin>
