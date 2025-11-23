@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.liangyonglin"
-version = "1.0.0"
+version = "1.0.1"
 
 repositories {
     maven {
@@ -52,15 +52,15 @@ tasks {
     }
 
     patchPluginXml {
-        sinceBuild.set("241")
+        sinceBuild.set("231")
         untilBuild.set("243.*")
         changeNotes.set("""
-            <h3>版本 1.0.0</h3>
-            <h4>初始版本</h4>
+            <h3>版本 1.0.1</h3>
+            <h4>更新内容</h4>
             <ul>
-                <li>✨ 支持自动向通义灵码提问</li>
-                <li>✨ 支持批量解释类中的所有方法</li>
-                <li>✨ 自动选择方法并触发灵码解释功能</li>
+                <li>✨ 优化用户体验</li>
+                <li>✨ 改进功能稳定性</li>
+                <li>✨ 提升整体性能</li>
             </ul>
         """.trimIndent())
     }
