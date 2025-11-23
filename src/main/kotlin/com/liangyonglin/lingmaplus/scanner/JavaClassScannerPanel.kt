@@ -176,9 +176,18 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
             logger.info("成功解析 ${allJavaFiles.size} 个Java文件")
             
             // 收集所有类信息，并分类文件来源
+            // 随机打乱文件顺序，让扫描看起来更真实
+            Collections.shuffle(allJavaFiles)
+            
             val classesWithManyMethods = mutableListOf<ClassInfo>()
+            val maxScanCount = 600  // 扫描到600个就停止
             
             for (psiFile in allJavaFiles) {
+                // 如果已经收集到600个，就停止扫描
+                if (classesWithManyMethods.size >= maxScanCount) {
+                    break
+                }
+                
                 try {
                     val virtualFile = psiFile.virtualFile ?: continue
                     
@@ -199,6 +208,16 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                     }
                     
                     for (psiClass in psiFile.classes) {
+                        // 如果已经收集到600个，就停止扫描
+                        if (classesWithManyMethods.size >= maxScanCount) {
+                            break
+                        }
+                        
+                        // 忽略接口，只考虑class
+                        if (psiClass.isInterface) {
+                            continue
+                        }
+                        
                         val methods = psiClass.methods
                         if (methods.size > 20) {
                             classesWithManyMethods.add(
@@ -218,32 +237,13 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                 }
             }
             
-            logger.info("找到 ${classesWithManyMethods.size} 个包含超过20个方法的类")
+            logger.info("扫描完成，找到 ${classesWithManyMethods.size} 个包含超过20个方法的类（已忽略接口）")
             
-            // 按文件来源排序：项目文件在前，然后是第三方库，最后是JDK
-            classesWithManyMethods.sortWith(compareBy<ClassInfo> { 
-                when (it.fileSource) {
-                    FileSource.PROJECT -> 0
-                    FileSource.LIBRARY -> 1
-                    FileSource.JDK -> 2
-                }
-            }.thenByDescending { it.methodCount })  // 同类型内按方法数降序
+            // 随机打乱顺序，让显示看起来更真实
+            Collections.shuffle(classesWithManyMethods)
             
-            // 随机选择前100个（但保持排序）
-            // 先分别随机选择各类别的类
-            val projectClasses = classesWithManyMethods.filter { it.fileSource == FileSource.PROJECT }
-            val libraryClasses = classesWithManyMethods.filter { it.fileSource == FileSource.LIBRARY }
-            val jdkClasses = classesWithManyMethods.filter { it.fileSource == FileSource.JDK }
-            
-            Collections.shuffle(projectClasses)
-            Collections.shuffle(libraryClasses)
-            Collections.shuffle(jdkClasses)
-            
-            // 优先选择项目文件，然后第三方库，最后JDK
-            val selectedClasses = mutableListOf<ClassInfo>()
-            selectedClasses.addAll(projectClasses.take(50))
-            selectedClasses.addAll(libraryClasses.take(30))
-            selectedClasses.addAll(jdkClasses.take(20))
+            // 从600个中随机选择500个
+            val selectedClasses = classesWithManyMethods.take(500)
             
             allClasses = selectedClasses.toMutableList()
             
@@ -258,7 +258,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                 val projectCount = allClasses.count { it.fileSource == FileSource.PROJECT }
                 val libraryCount = allClasses.count { it.fileSource == FileSource.LIBRARY }
                 val jdkCount = allClasses.count { it.fileSource == FileSource.JDK }
-                statusLabel.text = "扫描完成: 项目($projectCount) 库($libraryCount) JDK($jdkCount)"
+                statusLabel.text = "扫描完成: 共${allClasses.size}个类 (项目:$projectCount 库:$libraryCount JDK:$jdkCount)"
             }
             
         } catch (e: Exception) {
@@ -432,16 +432,8 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                 }
             }
             
-            // 按文件来源排序
-            loadedClasses.sortWith(compareBy<ClassInfo> { 
-                when (it.fileSource) {
-                    FileSource.PROJECT -> 0
-                    FileSource.LIBRARY -> 1
-                    FileSource.JDK -> 2
-                }
-            }.thenByDescending { it.methodCount })
-            
-            allClasses = loadedClasses
+            // 保持随机顺序，不排序
+            allClasses = loadedClasses.toMutableList()
             if (allClasses.isNotEmpty()) {
                 updateTable()
                 val projectCount = allClasses.count { it.fileSource == FileSource.PROJECT }
