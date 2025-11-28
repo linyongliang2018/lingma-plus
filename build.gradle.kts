@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.liangyonglin"
-version = "1.0.1"
+version = "1.0.2"
 
 repositories {
     maven {
@@ -55,12 +55,12 @@ tasks {
         sinceBuild.set("231")
         untilBuild.set("243.*")
         changeNotes.set("""
-            <h3>版本 1.0.1</h3>
+            <h3>版本 1.0.2</h3>
             <h4>更新内容</h4>
             <ul>
                 <li>✨ 优化用户体验</li>
-                <li>✨ 改进功能稳定性</li>
-                <li>✨ 提升整体性能</li>
+                <li>✨ 改进稳定性</li>
+                <li>✨ 调整部分细节</li>
             </ul>
         """.trimIndent())
     }

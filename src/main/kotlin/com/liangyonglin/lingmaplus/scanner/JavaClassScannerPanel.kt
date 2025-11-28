@@ -37,6 +37,8 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
     )
     
     private val logger = thisLogger()
+    private val ignoredSuffixes =
+        setOf("vo", "dto", "do", "po", "entity", "request", "response", "command", "model")
     private val scanButton = JButton("开始扫描")
     private val progressBar = JProgressBar()
     private val statusLabel = JLabel("准备就绪")
@@ -217,14 +219,22 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                         if (psiClass.isInterface) {
                             continue
                         }
+
+                        // 忽略以 VO/DTO 等领域后缀命名的简单类
+                        val simpleName = psiClass.name ?: continue
+                        if (shouldIgnoreBySuffix(simpleName)) {
+                            continue
+                        }
                         
+                        val fieldNames = psiClass.fields.mapNotNull { it.name?.let { name -> normalizeFieldName(name) } }.toSet()
                         val methods = psiClass.methods
-                        if (methods.size > 20) {
+                        val effectiveMethods = methods.filterNot { isAccessorMethod(it, fieldNames) }
+                        if (effectiveMethods.size > 20) {
                             classesWithManyMethods.add(
                                 ClassInfo(
                                     className = psiClass.qualifiedName ?: psiClass.name ?: "Unknown",
                                     filePath = virtualFile.path,
-                                    methodCount = methods.size,
+                                    methodCount = effectiveMethods.size,
                                     psiClass = psiClass,
                                     virtualFile = virtualFile,
                                     fileSource = fileSource
@@ -377,6 +387,49 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                     )
                 }
             }
+        }
+    }
+
+    /**
+     * 检查类名是否属于需要忽略的领域类型（VO/DTO等），忽略大小写
+     */
+    private fun shouldIgnoreBySuffix(name: String): Boolean {
+        val lower = name.lowercase(Locale.getDefault())
+        return ignoredSuffixes.any { lower.endsWith(it) }
+    }
+    
+    /**
+     * 规范化字段名用于匹配 getter/setter
+     */
+    private fun normalizeFieldName(name: String): String {
+        return name.trimStart('_').lowercase(Locale.getDefault())
+    }
+    
+    /**
+     * 判断方法是否为字段对应的 getter/setter 方法
+     */
+    private fun isAccessorMethod(method: PsiMethod, fieldNames: Set<String>): Boolean {
+        val name = method.name
+        val paramsCount = method.parameterList.parametersCount
+        if (name.startsWith("get") && paramsCount == 0) {
+            val property = normalizeFieldName(decapitalizeWord(name.removePrefix("get")))
+            return property.isNotEmpty() && property in fieldNames
+        }
+        if (name.startsWith("set") && paramsCount == 1) {
+            val property = normalizeFieldName(decapitalizeWord(name.removePrefix("set")))
+            return property.isNotEmpty() && property in fieldNames
+        }
+        if (name.startsWith("is") && paramsCount == 0) {
+            val property = normalizeFieldName(decapitalizeWord(name.removePrefix("is")))
+            return property.isNotEmpty() && property in fieldNames
+        }
+        return false
+    }
+    
+    private fun decapitalizeWord(value: String): String {
+        if (value.isEmpty()) return value
+        return value.replaceFirstChar { 
+            if (it.isUpperCase()) it.lowercase(Locale.getDefault()) else it.toString() 
         }
     }
     

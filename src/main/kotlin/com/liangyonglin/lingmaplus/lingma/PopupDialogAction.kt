@@ -56,13 +56,18 @@ class PopupDialogAction : AnAction() {
         }
 
         if (selectedMethods.size < 10) {
-            Messages.showInfoMessage(
+            val choice = Messages.showYesNoDialog(
                 project,
-                "筛选后方法数量为 ${selectedMethods.size} 个，不足 10 个，不执行提问\n" +
-                "(原始方法: ${allMethods.size} 个)",
-                "LingmaHelper"
+                "筛选后方法数量为 ${selectedMethods.size} 个，不足 10 个。\n" +
+                "是否仍然强制发起提问？（原始方法: ${allMethods.size} 个）",
+                "LingmaHelper",
+                "强制提问",
+                "取消",
+                null
             )
-            return
+            if (choice != Messages.YES) {
+                return
+            }
         }
 
         // 3) 获取配置的时间间隔
