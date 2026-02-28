@@ -15,6 +15,8 @@ class LingmaConfigDialog(project: Project?) : DialogWrapper(project) {
     
     private val minDelayField = JTextField(settings.getMinDelaySeconds().toString(), 10)
     private val maxDelayField = JTextField(settings.getMaxDelaySeconds().toString(), 10)
+    private val gitDaysField = JTextField(settings.getGitDaysBack().toString(), 10)
+    private val gitAuthorField = JTextField(settings.getGitAuthor(), 20)
     
     init {
         title = "LingmaHelper 配置"
@@ -24,17 +26,16 @@ class LingmaConfigDialog(project: Project?) : DialogWrapper(project) {
     override fun createCenterPanel(): JComponent {
         val panel = JPanel(BorderLayout(10, 10))
         panel.border = BorderFactory.createEmptyBorder(10, 10, 10, 10)
-        panel.preferredSize = Dimension(400, 120)
+        panel.preferredSize = Dimension(450, 220)
         
         val contentPanel = JPanel()
         contentPanel.layout = BoxLayout(contentPanel, BoxLayout.Y_AXIS)
         
-        // 说明文字
+        // 时间间隔
         val label1 = JLabel("设置每次提问之间的时间间隔（秒）")
         label1.border = BorderFactory.createEmptyBorder(0, 0, 10, 0)
         contentPanel.add(label1)
         
-        // 最小值输入
         val minPanel = JPanel(FlowLayout(FlowLayout.LEFT))
         minPanel.add(JLabel("最小值: "))
         minDelayField.preferredSize = Dimension(100, 25)
@@ -43,7 +44,6 @@ class LingmaConfigDialog(project: Project?) : DialogWrapper(project) {
         minPanel.alignmentX = Component.LEFT_ALIGNMENT
         contentPanel.add(minPanel)
         
-        // 最大值输入
         val maxPanel = JPanel(FlowLayout(FlowLayout.LEFT))
         maxPanel.add(JLabel("最大值: "))
         maxDelayField.preferredSize = Dimension(100, 25)
@@ -52,8 +52,29 @@ class LingmaConfigDialog(project: Project?) : DialogWrapper(project) {
         maxPanel.alignmentX = Component.LEFT_ALIGNMENT
         contentPanel.add(maxPanel)
         
+        // Git 扫描配置
+        val gitLabel = JLabel("Git 扫描配置（用于「扫描最近git修改」）")
+        gitLabel.border = BorderFactory.createEmptyBorder(15, 0, 10, 0)
+        contentPanel.add(gitLabel)
+        
+        val gitDaysPanel = JPanel(FlowLayout(FlowLayout.LEFT))
+        gitDaysPanel.add(JLabel("回溯天数: "))
+        gitDaysField.preferredSize = Dimension(80, 25)
+        gitDaysField.toolTipText = "扫描最近N天内修改的Java文件（1-1000天）"
+        gitDaysPanel.add(gitDaysField)
+        gitDaysPanel.alignmentX = Component.LEFT_ALIGNMENT
+        contentPanel.add(gitDaysPanel)
+        
+        val gitAuthorPanel = JPanel(FlowLayout(FlowLayout.LEFT))
+        gitAuthorPanel.add(JLabel("作者过滤: "))
+        gitAuthorField.preferredSize = Dimension(200, 25)
+        gitAuthorField.toolTipText = "Git 作者名，留空表示当前用户"
+        gitAuthorPanel.add(gitAuthorField)
+        gitAuthorPanel.alignmentX = Component.LEFT_ALIGNMENT
+        contentPanel.add(gitAuthorPanel)
+        
         // 提示信息
-        val hintLabel = JLabel("<html><small>当前配置: ${settings.getMinDelaySeconds()}-${settings.getMaxDelaySeconds()} 秒</small></html>")
+        val hintLabel = JLabel("<html><small>时间: ${settings.getMinDelaySeconds()}-${settings.getMaxDelaySeconds()}秒 | Git: ${settings.getGitDaysBack()}天 ${if (settings.getGitAuthor().isNotEmpty()) "作者:${settings.getGitAuthor()}" else "当前用户"}</small></html>")
         hintLabel.border = BorderFactory.createEmptyBorder(10, 0, 0, 0)
         contentPanel.add(hintLabel)
         
@@ -84,7 +105,20 @@ class LingmaConfigDialog(project: Project?) : DialogWrapper(project) {
                 return
             }
             
+            val gitDays = gitDaysField.text.toIntOrNull() ?: 5
+            val gitAuthor = gitAuthorField.text.trim()
+            
+            if (gitDays < 1 || gitDays > 1000) {
+                com.intellij.openapi.ui.Messages.showErrorDialog(
+                    contentPanel,
+                    "Git回溯天数应在1-1000之间",
+                    "配置错误"
+                )
+                return
+            }
+            
             settings.setDelayRange(min, max)
+            settings.setGitConfig(gitDays, gitAuthor)
             super.doOKAction()
         } catch (e: NumberFormatException) {
             com.intellij.openapi.ui.Messages.showErrorDialog(

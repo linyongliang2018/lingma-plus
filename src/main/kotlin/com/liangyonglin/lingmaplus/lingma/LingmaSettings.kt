@@ -1,31 +1,43 @@
 package com.liangyonglin.lingmaplus.lingma
 
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.components.*
+import com.intellij.openapi.components.Service
 
 /**
- * 插件配置类，使用 PersistentStateComponent 保存配置
+ * 插件配置类，配置持久化到本地 ~/.lingma-plus/lingma-config.json
+ * 参考 ClassInfoCache 实现，重启后自动加载
  */
-@State(
-    name = "LingmaSettings",
-    storages = [Storage("lingma-plus.xml")]
-)
 @Service
-class LingmaSettings : PersistentStateComponent<LingmaSettings.State> {
+class LingmaSettings {
     
-    data class State(
-        var minDelaySeconds: Int = 20,
-        var maxDelaySeconds: Int = 65
-    )
+    private var minDelaySeconds: Int = 20
+    private var maxDelaySeconds: Int = 65
+    private var gitDaysBack: Int = 5
+    private var gitAuthor: String = ""  // 空表示当前用户
     
-    private var myState = State()
-    
-    override fun getState(): State {
-        return myState
+    init {
+        loadFromCache()
     }
     
-    override fun loadState(state: State) {
-        myState = state
+    private fun loadFromCache() {
+        val cached = LingmaConfigCache.loadConfig()
+        if (cached != null) {
+            minDelaySeconds = cached.minDelaySeconds
+            maxDelaySeconds = cached.maxDelaySeconds
+            gitDaysBack = cached.gitDaysBack
+            gitAuthor = cached.gitAuthor
+        }
+    }
+    
+    private fun saveToCache() {
+        LingmaConfigCache.saveConfig(
+            LingmaConfigCache.LingmaConfigData(
+                minDelaySeconds = minDelaySeconds,
+                maxDelaySeconds = maxDelaySeconds,
+                gitDaysBack = gitDaysBack,
+                gitAuthor = gitAuthor
+            )
+        )
     }
     
     companion object {
@@ -34,12 +46,21 @@ class LingmaSettings : PersistentStateComponent<LingmaSettings.State> {
         }
     }
     
-    fun getMinDelaySeconds(): Int = myState.minDelaySeconds
-    fun getMaxDelaySeconds(): Int = myState.maxDelaySeconds
+    fun getMinDelaySeconds(): Int = minDelaySeconds
+    fun getMaxDelaySeconds(): Int = maxDelaySeconds
+    fun getGitDaysBack(): Int = gitDaysBack
+    fun getGitAuthor(): String = gitAuthor
     
     fun setDelayRange(min: Int, max: Int) {
-        myState.minDelaySeconds = min
-        myState.maxDelaySeconds = max
+        minDelaySeconds = min
+        maxDelaySeconds = max
+        saveToCache()
+    }
+    
+    fun setGitConfig(daysBack: Int, author: String) {
+        gitDaysBack = daysBack
+        gitAuthor = author
+        saveToCache()
     }
 }
 

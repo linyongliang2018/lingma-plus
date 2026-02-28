@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.liangyonglin"
-version = "1.0.2"
+version = "1.1.0"
 
 repositories {
     maven {
@@ -55,12 +55,16 @@ tasks {
         sinceBuild.set("231")
         untilBuild.set("243.*")
         changeNotes.set("""
-            <h3>版本 1.0.2</h3>
+            <h3>版本 1.1.0</h3>
             <h4>更新内容</h4>
             <ul>
-                <li>✨ 优化用户体验</li>
-                <li>✨ 改进稳定性</li>
-                <li>✨ 调整部分细节</li>
+                <li>✨ 新增「扫描最近git修改」：按配置的天数、作者扫描 Git 修改的 Java 类</li>
+                <li>✨ 新增「开始优化」：多选类后批量调用灵码优化（TriggerCosyOptimizeCodeGenerationAction）</li>
+                <li>✨ @Data 类整类发送优化，普通类按方法逐个遍历优化</li>
+                <li>✨ Git 配置：回溯天数支持 1-1000 天，支持作者过滤</li>
+                <li>✨ 配置本地持久化到 ~/.lingma-plus/lingma-config.json，重启后自动加载</li>
+                <li>✨ JavaClassScanner 面板新增「配置」「设置」按钮，方便快速访问</li>
+                <li>✨ 表格支持多选，按顺序逐个类提问</li>
             </ul>
         """.trimIndent())
     }

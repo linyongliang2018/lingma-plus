@@ -37,6 +37,7 @@
     </actions>
 
     <extensions defaultExtensionNs="com.intellij">
+        <applicationService serviceImplementation="com.liangyonglin.lingmaplus.lingma.LingmaSettings"/>
         <toolWindow id="JavaClassScanner" 
                     secondary="false" 
                     anchor="right" 
