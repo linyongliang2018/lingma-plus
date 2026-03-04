@@ -52,7 +52,9 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
         setOf("vo", "dto", "do", "po", "entity", "request", "response", "command", "model")
     private val scanButton = JButton("开始扫描")
     private val scanGitButton = JButton("扫描最近git修改")
+    private val scanStagedButton = JButton("扫描贮存区修改文件")
     private val optimizeButton = JButton("开始优化")
+    private val commentButton = JButton("开始注释")
     private val configButton = JButton("配置")
     private val settingsButton = JButton("设置")
     private val progressBar = JProgressBar()
@@ -78,7 +80,9 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
         val buttonPanel = JPanel()
         buttonPanel.add(scanButton)
         buttonPanel.add(scanGitButton)
+        buttonPanel.add(scanStagedButton)
         buttonPanel.add(optimizeButton)
+        buttonPanel.add(commentButton)
         buttonPanel.add(configButton)
         buttonPanel.add(settingsButton)
         topPanel.add(buttonPanel, BorderLayout.WEST)
@@ -106,10 +110,16 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
         val popupMenu = JPopupMenu()
         val navigateMenuItem = JMenuItem("导航到类")
         val optimizeMenuItem = JMenuItem("对选中项开始优化")
+        val commentMenuItem = JMenuItem("对选中项生成注释")
+        val explainMenuItem = JMenuItem("对选中项进行解释")
         navigateMenuItem.addActionListener { navigateToClass() }
         optimizeMenuItem.addActionListener { startOptimize() }
+        commentMenuItem.addActionListener { startCommentGeneration() }
+        explainMenuItem.addActionListener { explainSelectedClasses() }
         popupMenu.add(navigateMenuItem)
         popupMenu.add(optimizeMenuItem)
+        popupMenu.add(commentMenuItem)
+        popupMenu.add(explainMenuItem)
         
         table.addMouseListener(object : MouseAdapter() {
             override fun mousePressed(e: MouseEvent) {
@@ -129,6 +139,8 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                     val hasSelection = table.selectedRowCount > 0
                     navigateMenuItem.isEnabled = hasSelection
                     optimizeMenuItem.isEnabled = hasSelection
+                    commentMenuItem.isEnabled = hasSelection
+                    explainMenuItem.isEnabled = hasSelection
                     popupMenu.show(table, e.x, e.y)
                 }
             }
@@ -151,7 +163,9 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
         // 事件处理
         scanButton.addActionListener { startScan() }
         scanGitButton.addActionListener { startScanGitModified() }
+        scanStagedButton.addActionListener { startScanGitStaged() }
         optimizeButton.addActionListener { startOptimize() }
+        commentButton.addActionListener { startCommentGeneration() }
         configButton.addActionListener { openConfig() }
         settingsButton.addActionListener { openSettings() }
         prevButton.addActionListener { goToPreviousPage() }
@@ -198,6 +212,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
         
         scanButton.isEnabled = false
         scanGitButton.isEnabled = false
+        scanStagedButton.isEnabled = false
         progressBar.isVisible = true
         progressBar.isIndeterminate = true
         statusLabel.text = "正在扫描 git 修改..."
@@ -338,8 +353,85 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                 )
                 scanButton.isEnabled = true
                 scanGitButton.isEnabled = true
+                scanStagedButton.isEnabled = true
                 progressBar.isVisible = false
                 statusLabel.text = "扫描失败"
+            }
+        }
+    }
+    
+    private fun scanGitStagedFiles(projectBasePath: String) {
+        try {
+            val javaPaths = GitModifiedFilesService.getStagedJavaFiles(projectBasePath)
+            logger.info("Git 贮存区扫描到 ${javaPaths.size} 个 Java 文件")
+            
+            if (javaPaths.isEmpty()) {
+                ApplicationManager.getApplication().invokeLater {
+                    updateTable()
+                    scanButton.isEnabled = true
+                    scanGitButton.isEnabled = true
+                    scanStagedButton.isEnabled = true
+                    progressBar.isVisible = false
+                    statusLabel.text = "贮存区中未找到已暂存的 Java 修改文件"
+                }
+                return
+            }
+            
+            val fileIndex = ProjectRootManager.getInstance(project).fileIndex
+            val psiManager = PsiManager.getInstance(project)
+            val localFs = LocalFileSystem.getInstance()
+            val classesFromGit = mutableListOf<ClassInfo>()
+            
+            for (absPath in javaPaths) {
+                try {
+                    val virtualFile = localFs.findFileByPath(absPath) ?: continue
+                    val psiFile = psiManager.findFile(virtualFile) as? PsiJavaFile ?: continue
+                    val fileSource = when {
+                        fileIndex.isInSourceContent(virtualFile) -> FileSource.PROJECT
+                        fileIndex.isInLibraryClasses(virtualFile) -> FileSource.LIBRARY
+                        else -> FileSource.PROJECT
+                    }
+                    for (psiClass in psiFile.classes) {
+                        if (psiClass.isInterface) continue
+                        val methods = psiClass.methods
+                        val fieldNames = psiClass.fields.mapNotNull { it.name?.let { n -> normalizeFieldName(n) } }.toSet()
+                        val effectiveMethods = methods.filterNot { isAccessorMethod(it, fieldNames) }
+                        classesFromGit.add(
+                            ClassInfo(
+                                className = psiClass.qualifiedName ?: psiClass.name ?: "Unknown",
+                                filePath = virtualFile.path,
+                                methodCount = effectiveMethods.size,
+                                psiClass = psiClass,
+                                virtualFile = virtualFile,
+                                fileSource = fileSource
+                            )
+                        )
+                    }
+                } catch (e: Exception) {
+                    logger.warn("处理贮存区文件失败: $absPath", e)
+                }
+            }
+            
+            allClasses = classesFromGit.toMutableList()
+            currentPage = 0
+            
+            ApplicationManager.getApplication().invokeLater {
+                updateTable()
+                scanButton.isEnabled = true
+                scanGitButton.isEnabled = true
+                scanStagedButton.isEnabled = true
+                progressBar.isVisible = false
+                statusLabel.text = "贮存区扫描完成: 共 ${allClasses.size} 个类"
+            }
+        } catch (e: Exception) {
+            logger.error("Git 贮存区扫描失败", e)
+            ApplicationManager.getApplication().invokeLater {
+                Messages.showErrorDialog(project, "Git 贮存区扫描失败: ${e.message}", "扫描错误")
+                scanButton.isEnabled = true
+                scanGitButton.isEnabled = true
+                scanStagedButton.isEnabled = true
+                progressBar.isVisible = false
+                statusLabel.text = "Git 贮存区扫描失败"
             }
         }
     }
@@ -354,6 +446,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                     updateTable()
                     scanButton.isEnabled = true
                     scanGitButton.isEnabled = true
+                    scanStagedButton.isEnabled = true
                     progressBar.isVisible = false
                     statusLabel.text = "未找到符合条件的 Java 文件"
                 }
@@ -402,6 +495,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                 updateTable()
                 scanButton.isEnabled = true
                 scanGitButton.isEnabled = true
+                scanStagedButton.isEnabled = true
                 progressBar.isVisible = false
                 statusLabel.text = "Git 扫描完成: 共 ${allClasses.size} 个类（最近 ${daysBack} 天）"
             }
@@ -411,10 +505,30 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                 Messages.showErrorDialog(project, "Git 扫描失败: ${e.message}", "扫描错误")
                 scanButton.isEnabled = true
                 scanGitButton.isEnabled = true
+                scanStagedButton.isEnabled = true
                 progressBar.isVisible = false
                 statusLabel.text = "Git 扫描失败"
             }
         }
+    }
+    
+    fun startScanGitStaged() {
+        val projectBasePath = project.basePath
+        if (projectBasePath.isNullOrBlank()) {
+            Messages.showErrorDialog(project, "无法获取项目路径", "扫描失败")
+            return
+        }
+        
+        scanButton.isEnabled = false
+        scanGitButton.isEnabled = false
+        scanStagedButton.isEnabled = false
+        progressBar.isVisible = true
+        progressBar.isIndeterminate = true
+        statusLabel.text = "正在扫描贮存区修改文件..."
+        
+        ReadAction.nonBlocking {
+            scanGitStagedFiles(projectBasePath)
+        }.submit(AppExecutorUtil.getAppExecutorService())
     }
     
     private fun updateTable() {
@@ -522,9 +636,30 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
     }
     
     private fun startOptimize() {
+        startBatchLingmaAction(
+            actionId = "TriggerCosyOptimizeCodeGenerationAction",
+            actionDesc = "优化"
+        )
+    }
+    
+    private fun startCommentGeneration() {
+        startBatchLingmaAction(
+            actionId = "TriggerCosyCodeGenerateCommentGenerationAction",
+            actionDesc = "生成注释"
+        )
+    }
+    
+    private fun explainSelectedClasses() {
+        startBatchLingmaAction(
+            actionId = "TriggerCosyExplainCodeGenerationAction",
+            actionDesc = "解释"
+        )
+    }
+    
+    private fun startBatchLingmaAction(actionId: String, actionDesc: String) {
         val selectedViewRows = table.selectedRows
         if (selectedViewRows.isEmpty()) {
-            Messages.showInfoMessage(project, "请先选择要优化的类", "LingmaHelper")
+            Messages.showInfoMessage(project, "请先选择要处理的类", "LingmaHelper")
             return
         }
         
@@ -537,11 +672,11 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
         
         if (selectedClasses.isEmpty()) return
         
-        val cosyAction = ActionManager.getInstance().getAction("TriggerCosyOptimizeCodeGenerationAction")
+        val cosyAction = ActionManager.getInstance().getAction(actionId)
             ?: run {
                 Messages.showErrorDialog(
                     project,
-                    "找不到 Lingma 优化 Action (TriggerCosyOptimizeCodeGenerationAction)",
+                    "找不到 Lingma Action ($actionId)",
                     "LingmaHelper"
                 )
                 return
@@ -551,16 +686,29 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
         val minDelay = settings.getMinDelaySeconds()
         val maxDelay = settings.getMaxDelaySeconds()
         
-        // 统计任务数量：@Data 类 1 次，普通类按方法数
+        // 统计任务数量：@Data 类 1 次，普通类按方法数；无 @Data 且无方法的类会被忽略
         var totalTasks = 0
         for (ci in selectedClasses) {
-            totalTasks += if (hasLombokData(ci.psiClass)) 1 else ci.psiClass.methods.size
+            totalTasks += when {
+                hasLombokData(ci.psiClass) -> 1
+                ci.psiClass.methods.isNotEmpty() -> ci.psiClass.methods.size
+                else -> 0
+            }
+        }
+        
+        if (totalTasks == 0) {
+            Messages.showInfoMessage(
+                project,
+                "选中的类中没有带 @Data 的类，且也没有包含任何方法，已忽略。",
+                "LingmaHelper"
+            )
+            return
         }
         
         val avgDelay = (minDelay + maxDelay) / 2
         Messages.showInfoMessage(
             project,
-            "将对 ${selectedClasses.size} 个类发起约 $totalTasks 次优化请求\n" +
+            "将对 ${selectedClasses.size} 个类发起约 $totalTasks 次${actionDesc}请求\n" +
             "时间间隔: ${minDelay}-${maxDelay} 秒",
             "LingmaHelper"
         )
@@ -570,12 +718,15 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
         
         for (classInfo in selectedClasses) {
             if (!classInfo.psiClass.isValid) continue
-            if (hasLombokData(classInfo.psiClass)) {
-                // @Data 类：整个类发送优化
+            val psiClass = classInfo.psiClass
+            if (hasLombokData(psiClass)) {
+                // @Data 类：整个类发送
                 taskQueue.add(OptimizeTask.WholeClass(classInfo))
             } else {
-                // 普通类：遍历每一个方法
-                for (method in classInfo.psiClass.methods) {
+                // 普通类：按方法发送；若无方法则忽略该类
+                val methods = psiClass.methods
+                if (methods.isEmpty()) continue
+                for (method in methods) {
                     taskQueue.add(OptimizeTask.Method(classInfo, method))
                 }
             }

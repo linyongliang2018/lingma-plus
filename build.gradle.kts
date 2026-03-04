@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.liangyonglin"
-version = "1.1.0"
+version = "1.2.0"
 
 repositories {
     maven {
@@ -55,16 +55,14 @@ tasks {
         sinceBuild.set("231")
         untilBuild.set("243.*")
         changeNotes.set("""
-            <h3>版本 1.1.0</h3>
+            <h3>版本 1.2.0</h3>
             <h4>更新内容</h4>
             <ul>
-                <li>✨ 新增「扫描最近git修改」：按配置的天数、作者扫描 Git 修改的 Java 类</li>
-                <li>✨ 新增「开始优化」：多选类后批量调用灵码优化（TriggerCosyOptimizeCodeGenerationAction）</li>
-                <li>✨ @Data 类整类发送优化，普通类按方法逐个遍历优化</li>
-                <li>✨ Git 配置：回溯天数支持 1-1000 天，支持作者过滤</li>
-                <li>✨ 配置本地持久化到 ~/.lingma-plus/lingma-config.json，重启后自动加载</li>
-                <li>✨ JavaClassScanner 面板新增「配置」「设置」按钮，方便快速访问</li>
-                <li>✨ 表格支持多选，按顺序逐个类提问</li>
+                <li>✨ 新增「开始注解」：多选类后批量调用灵码注释生成功能（TriggerCosyCodeGenerateCommentGenerationAction），@Data 类整类发送、普通类按方法拆分</li>
+                <li>✨ 新增「扫描贮存区修改文件」：支持基于 git diff --cached --name-only 扫描已暂存的 Java 文件，自动忽略未加入 Git 管理的文件</li>
+                <li>✨ 右键菜单增强：支持对选中类执行批量优化、批量注释和批量解释，多选时行为与顶部按钮保持一致</li>
+                <li>✨ 统一时间间隔配置：优化 / 注释 / 解释三种批量调用统一复用 Lingma 配置中的最小/最大时间间隔</li>
+                <li>✨ Git 扫描逻辑重用：封装通用 Git 扫描与 .java 文件解析工具，最近修改与贮存区扫描共享实现</li>
             </ul>
         """.trimIndent())
     }
