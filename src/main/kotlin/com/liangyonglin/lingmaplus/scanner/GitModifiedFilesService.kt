@@ -35,10 +35,12 @@ object GitModifiedFilesService {
     }
     
     /**
-     * 获取当前 Git 暂存区（贮存区）中已暂存的 .java 文件的绝对路径列表
-     * 仅包含已加入 Git 管理并添加到暂存区的修改/新增文件，忽略未跟踪文件
+     * 获取尚未提交到 Git 的 .java 文件（包含暂存区 + 工作区修改）
+     * - 暂存区：已 git add 的修改
+     * - 工作区：已修改但未 add 的文件（IDE 中显示为蓝色的）
+     * 忽略未加入 Git 管理的文件（untracked）
      */
-    fun getStagedJavaFiles(projectBasePath: String?): List<String> {
+    fun getUncommittedJavaFiles(projectBasePath: String?): List<String> {
         if (projectBasePath.isNullOrBlank()) return emptyList()
         
         val baseDir = File(projectBasePath)
@@ -50,15 +52,15 @@ object GitModifiedFilesService {
             return emptyList()
         }
         
-        val cmd = listOf(
-            "git",
-            "diff",
-            "--cached",
-            "--name-only",
-            "--",
-            "*.java"
-        )
-        return runGitAndParseJavaFiles(baseDir, cmd)
+        // 暂存区：已 add 的修改
+        val staged = runGitAndParseJavaFiles(baseDir, listOf(
+            "git", "diff", "--cached", "--name-only", "--", "*.java"
+        ))
+        // 工作区：已修改但未 add 的文件（蓝色）
+        val unstaged = runGitAndParseJavaFiles(baseDir, listOf(
+            "git", "diff", "--name-only", "--", "*.java"
+        ))
+        return (staged + unstaged).distinct()
     }
     
     private fun getCurrentGitUser(workDir: File): String {

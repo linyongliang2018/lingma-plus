@@ -52,7 +52,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
         setOf("vo", "dto", "do", "po", "entity", "request", "response", "command", "model")
     private val scanButton = JButton("开始扫描")
     private val scanGitButton = JButton("扫描最近git修改")
-    private val scanStagedButton = JButton("扫描贮存区修改文件")
+    private val scanStagedButton = JButton("扫描未提交修改")
     private val optimizeButton = JButton("开始优化")
     private val commentButton = JButton("开始注释")
     private val configButton = JButton("配置")
@@ -67,7 +67,13 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
     
     private var allClasses: MutableList<ClassInfo> = mutableListOf()
     private var currentPage = 0
-    private val pageSize = 20
+    
+    private fun getPageSize(): Int = LingmaSettings.getInstance().getPageSize()
+    
+    /** 按类名排序后再分页展示 */
+    private fun sortClassesByClassName() {
+        allClasses.sortBy { it.className }
+    }
     
     init {
         setupUI()
@@ -327,6 +333,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
             val selectedClasses = classesWithManyMethods.take(500)
             
             allClasses = selectedClasses.toMutableList()
+            sortClassesByClassName()
             
             // 保存缓存
             saveCache()
@@ -362,8 +369,8 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
     
     private fun scanGitStagedFiles(projectBasePath: String) {
         try {
-            val javaPaths = GitModifiedFilesService.getStagedJavaFiles(projectBasePath)
-            logger.info("Git 贮存区扫描到 ${javaPaths.size} 个 Java 文件")
+            val javaPaths = GitModifiedFilesService.getUncommittedJavaFiles(projectBasePath)
+            logger.info("Git 未提交修改扫描到 ${javaPaths.size} 个 Java 文件")
             
             if (javaPaths.isEmpty()) {
                 ApplicationManager.getApplication().invokeLater {
@@ -372,7 +379,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                     scanGitButton.isEnabled = true
                     scanStagedButton.isEnabled = true
                     progressBar.isVisible = false
-                    statusLabel.text = "贮存区中未找到已暂存的 Java 修改文件"
+                    statusLabel.text = "未找到未提交的 Java 修改文件"
                 }
                 return
             }
@@ -408,11 +415,12 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                         )
                     }
                 } catch (e: Exception) {
-                    logger.warn("处理贮存区文件失败: $absPath", e)
+                    logger.warn("处理未提交文件失败: $absPath", e)
                 }
             }
             
             allClasses = classesFromGit.toMutableList()
+            sortClassesByClassName()
             currentPage = 0
             
             ApplicationManager.getApplication().invokeLater {
@@ -421,17 +429,17 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                 scanGitButton.isEnabled = true
                 scanStagedButton.isEnabled = true
                 progressBar.isVisible = false
-                statusLabel.text = "贮存区扫描完成: 共 ${allClasses.size} 个类"
+                statusLabel.text = "未提交修改扫描完成: 共 ${allClasses.size} 个类"
             }
         } catch (e: Exception) {
-            logger.error("Git 贮存区扫描失败", e)
+            logger.error("Git 未提交修改扫描失败", e)
             ApplicationManager.getApplication().invokeLater {
-                Messages.showErrorDialog(project, "Git 贮存区扫描失败: ${e.message}", "扫描错误")
+                Messages.showErrorDialog(project, "Git 未提交修改扫描失败: ${e.message}", "扫描错误")
                 scanButton.isEnabled = true
                 scanGitButton.isEnabled = true
                 scanStagedButton.isEnabled = true
                 progressBar.isVisible = false
-                statusLabel.text = "Git 贮存区扫描失败"
+                statusLabel.text = "Git 未提交修改扫描失败"
             }
         }
     }
@@ -489,6 +497,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
             }
             
             allClasses = classesFromGit.toMutableList()
+            sortClassesByClassName()
             currentPage = 0
             
             ApplicationManager.getApplication().invokeLater {
@@ -524,7 +533,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
         scanStagedButton.isEnabled = false
         progressBar.isVisible = true
         progressBar.isIndeterminate = true
-        statusLabel.text = "正在扫描贮存区修改文件..."
+        statusLabel.text = "正在扫描未提交修改..."
         
         ReadAction.nonBlocking {
             scanGitStagedFiles(projectBasePath)
@@ -533,7 +542,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
     
     private fun updateTable() {
         tableModel.rowCount = 0
-        
+        val pageSize = getPageSize()
         val startIndex = currentPage * pageSize
         val endIndex = minOf(startIndex + pageSize, allClasses.size)
         
@@ -566,6 +575,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
     }
     
     private fun goToNextPage() {
+        val pageSize = getPageSize()
         val totalPages = if (allClasses.isEmpty()) 0 else (allClasses.size + pageSize - 1) / pageSize
         if (currentPage < totalPages - 1) {
             currentPage++
@@ -576,7 +586,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
     private fun navigateToClass() {
         val selectedRow = table.selectedRow
         if (selectedRow >= 0) {
-            val actualIndex = currentPage * pageSize + selectedRow
+            val actualIndex = currentPage * getPageSize() + selectedRow
             if (actualIndex < allClasses.size) {
                 val classInfo = allClasses[actualIndex]
                 try {
@@ -664,6 +674,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
         }
         
         // 按表格顺序逐个类处理：先排序行号，再映射为 ClassInfo
+        val pageSize = getPageSize()
         val selectedClasses: List<ClassInfo> = selectedViewRows
             .sorted()
             .map { currentPage * pageSize + it }
@@ -888,8 +899,8 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                 }
             }
             
-            // 保持随机顺序，不排序
             allClasses = loadedClasses.toMutableList()
+            sortClassesByClassName()
             if (allClasses.isNotEmpty()) {
                 updateTable()
                 val projectCount = allClasses.count { it.fileSource == FileSource.PROJECT }

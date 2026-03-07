@@ -14,6 +14,7 @@ class LingmaSettings {
     private var maxDelaySeconds: Int = 65
     private var gitDaysBack: Int = 5
     private var gitAuthor: String = ""  // 空表示当前用户
+    private var pageSize: Int = 20  // 分页每页类数量
     
     init {
         loadFromCache()
@@ -26,6 +27,7 @@ class LingmaSettings {
             maxDelaySeconds = cached.maxDelaySeconds
             gitDaysBack = cached.gitDaysBack
             gitAuthor = cached.gitAuthor
+            pageSize = cached.pageSize
         }
     }
     
@@ -35,7 +37,8 @@ class LingmaSettings {
                 minDelaySeconds = minDelaySeconds,
                 maxDelaySeconds = maxDelaySeconds,
                 gitDaysBack = gitDaysBack,
-                gitAuthor = gitAuthor
+                gitAuthor = gitAuthor,
+                pageSize = pageSize
             )
         )
     }
@@ -50,6 +53,7 @@ class LingmaSettings {
     fun getMaxDelaySeconds(): Int = maxDelaySeconds
     fun getGitDaysBack(): Int = gitDaysBack
     fun getGitAuthor(): String = gitAuthor
+    fun getPageSize(): Int = pageSize.coerceIn(1, 500)
     
     fun setDelayRange(min: Int, max: Int) {
         minDelaySeconds = min
@@ -60,6 +64,11 @@ class LingmaSettings {
     fun setGitConfig(daysBack: Int, author: String) {
         gitDaysBack = daysBack
         gitAuthor = author
+        saveToCache()
+    }
+    
+    fun setPageSize(size: Int) {
+        pageSize = size.coerceIn(1, 500)
         saveToCache()
     }
 }

@@ -34,9 +34,10 @@ object LingmaConfigCache {
             val maxDelay = extractIntValue(json, "maxDelaySeconds")
             val gitDaysBack = extractIntValue(json, "gitDaysBack")
             val gitAuthor = extractStringValue(json, "gitAuthor") ?: ""
+            val pageSize = extractIntValue(json, "pageSize") ?: 20
             if (minDelay != null && maxDelay != null && gitDaysBack != null) {
-                logger.info("已从本地加载配置: 间隔${minDelay}-${maxDelay}秒, Git${gitDaysBack}天")
-                return LingmaConfigData(minDelay, maxDelay, gitDaysBack, gitAuthor)
+                logger.info("已从本地加载配置: 间隔${minDelay}-${maxDelay}秒, Git${gitDaysBack}天, 页容量${pageSize}")
+                return LingmaConfigData(minDelay, maxDelay, gitDaysBack, gitAuthor, pageSize)
             }
         } catch (e: Exception) {
             logger.error("加载配置失败", e)
@@ -52,7 +53,8 @@ object LingmaConfigCache {
                   "minDelaySeconds": ${data.minDelaySeconds},
                   "maxDelaySeconds": ${data.maxDelaySeconds},
                   "gitDaysBack": ${data.gitDaysBack},
-                  "gitAuthor": "${escapeJson(data.gitAuthor)}"
+                  "gitAuthor": "${escapeJson(data.gitAuthor)}",
+                  "pageSize": ${data.pageSize}
                 }
             """.trimIndent()
             configFile.writeText(json)
@@ -66,7 +68,8 @@ object LingmaConfigCache {
         val minDelaySeconds: Int,
         val maxDelaySeconds: Int,
         val gitDaysBack: Int,
-        val gitAuthor: String
+        val gitAuthor: String,
+        val pageSize: Int = 20
     )
     
     private fun escapeJson(str: String): String {

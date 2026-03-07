@@ -17,6 +17,7 @@ class LingmaConfigDialog(project: Project?) : DialogWrapper(project) {
     private val maxDelayField = JTextField(settings.getMaxDelaySeconds().toString(), 10)
     private val gitDaysField = JTextField(settings.getGitDaysBack().toString(), 10)
     private val gitAuthorField = JTextField(settings.getGitAuthor(), 20)
+    private val pageSizeField = JTextField(settings.getPageSize().toString(), 10)
     
     init {
         title = "LingmaHelper 配置"
@@ -26,7 +27,7 @@ class LingmaConfigDialog(project: Project?) : DialogWrapper(project) {
     override fun createCenterPanel(): JComponent {
         val panel = JPanel(BorderLayout(10, 10))
         panel.border = BorderFactory.createEmptyBorder(10, 10, 10, 10)
-        panel.preferredSize = Dimension(450, 220)
+        panel.preferredSize = Dimension(450, 280)
         
         val contentPanel = JPanel()
         contentPanel.layout = BoxLayout(contentPanel, BoxLayout.Y_AXIS)
@@ -73,8 +74,20 @@ class LingmaConfigDialog(project: Project?) : DialogWrapper(project) {
         gitAuthorPanel.alignmentX = Component.LEFT_ALIGNMENT
         contentPanel.add(gitAuthorPanel)
         
+        // 分页配置
+        val pageLabel = JLabel("JavaClassScanner 分页")
+        pageLabel.border = BorderFactory.createEmptyBorder(15, 0, 10, 0)
+        contentPanel.add(pageLabel)
+        val pageSizePanel = JPanel(FlowLayout(FlowLayout.LEFT))
+        pageSizePanel.add(JLabel("页容量: "))
+        pageSizeField.preferredSize = Dimension(80, 25)
+        pageSizeField.toolTipText = "每页显示的类数量（1-500），例如 20"
+        pageSizePanel.add(pageSizeField)
+        pageSizePanel.alignmentX = Component.LEFT_ALIGNMENT
+        contentPanel.add(pageSizePanel)
+        
         // 提示信息
-        val hintLabel = JLabel("<html><small>时间: ${settings.getMinDelaySeconds()}-${settings.getMaxDelaySeconds()}秒 | Git: ${settings.getGitDaysBack()}天 ${if (settings.getGitAuthor().isNotEmpty()) "作者:${settings.getGitAuthor()}" else "当前用户"}</small></html>")
+        val hintLabel = JLabel("<html><small>时间: ${settings.getMinDelaySeconds()}-${settings.getMaxDelaySeconds()}秒 | Git: ${settings.getGitDaysBack()}天 ${if (settings.getGitAuthor().isNotEmpty()) "作者:${settings.getGitAuthor()}" else "当前用户"} | 页容量: ${settings.getPageSize()}</small></html>")
         hintLabel.border = BorderFactory.createEmptyBorder(10, 0, 0, 0)
         contentPanel.add(hintLabel)
         
@@ -117,8 +130,19 @@ class LingmaConfigDialog(project: Project?) : DialogWrapper(project) {
                 return
             }
             
+            val pageSize = pageSizeField.text.toIntOrNull() ?: 20
+            if (pageSize < 1 || pageSize > 500) {
+                com.intellij.openapi.ui.Messages.showErrorDialog(
+                    contentPanel,
+                    "页容量应在1-500之间",
+                    "配置错误"
+                )
+                return
+            }
+            
             settings.setDelayRange(min, max)
             settings.setGitConfig(gitDays, gitAuthor)
+            settings.setPageSize(pageSize)
             super.doOKAction()
         } catch (e: NumberFormatException) {
             com.intellij.openapi.ui.Messages.showErrorDialog(
