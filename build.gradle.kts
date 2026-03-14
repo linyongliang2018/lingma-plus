@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.liangyonglin"
-version = "1.4.0"
+version = "1.4.1"
 
 repositories {
     maven {
@@ -55,11 +55,10 @@ tasks {
         sinceBuild.set("231")
         untilBuild.set("243.*")
         changeNotes.set("""
-            <h3>版本 1.4.0</h3>
+            <h3>版本 1.4.1</h3>
             <h4>更新内容</h4>
             <ul>
-                <li>✨ 批量请求进度显示：优化/注释/解释多选时弹窗展示当前类、方法、剩余数、进度条</li>
-                <li>🐛 修复当前进度计数，处理第 1 个任务时正确显示 1/N</li>
+                <li>🔧 增大批量进度窗口默认尺寸，进度条更易查看</li>
             </ul>
         """.trimIndent())
     }

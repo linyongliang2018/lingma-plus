@@ -44,7 +44,7 @@ class BatchProgressDialog(
     override fun createCenterPanel(): JComponent {
         val panel = JPanel(BorderLayout(10, 10))
         panel.border = BorderFactory.createEmptyBorder(15, 15, 15, 15)
-        panel.preferredSize = Dimension(520, 280)
+        panel.preferredSize = Dimension(720, 420)
 
         val grid = JPanel()
         grid.layout = BoxLayout(grid, BoxLayout.Y_AXIS)
@@ -52,9 +52,9 @@ class BatchProgressDialog(
         fun addRow(label: String, valueComp: JComponent) {
             val row = JPanel(FlowLayout(FlowLayout.LEFT))
             val l = JLabel("$label: ")
-            l.preferredSize = Dimension(100, 22)
+            l.preferredSize = Dimension(100, 24)
             row.add(l)
-            valueComp.preferredSize = Dimension(380, 22)
+            valueComp.preferredSize = Dimension(560, 24)
             row.add(valueComp)
             grid.add(row)
         }
@@ -67,10 +67,10 @@ class BatchProgressDialog(
         addRow("当前进度", currentProgressLabel)
         addRow("剩余进度", remainingProgressLabel)
 
-        grid.add(Box.createVerticalStrut(10))
+        grid.add(Box.createVerticalStrut(12))
         val barPanel = JPanel(FlowLayout(FlowLayout.LEFT))
         barPanel.add(JLabel("进度条: "))
-        progressBar.preferredSize = Dimension(400, 22)
+        progressBar.preferredSize = Dimension(580, 26)
         barPanel.add(progressBar)
         grid.add(barPanel)
 
