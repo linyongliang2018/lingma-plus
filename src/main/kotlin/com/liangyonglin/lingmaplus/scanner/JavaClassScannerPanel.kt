@@ -21,6 +21,7 @@ import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
 import com.intellij.util.concurrency.AppExecutorUtil
+import com.liangyonglin.lingmaplus.lingma.BatchProgressDialog
 import com.liangyonglin.lingmaplus.lingma.LingmaConfigDialog
 import com.liangyonglin.lingmaplus.lingma.LingmaSettings
 import java.awt.BorderLayout
@@ -726,29 +727,67 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
         
         val scheduler = Executors.newSingleThreadScheduledExecutor()
         val taskQueue = ArrayDeque<OptimizeTask>()
+        val remainingTasksByClass = mutableMapOf<String, Int>()
         
         for (classInfo in selectedClasses) {
             if (!classInfo.psiClass.isValid) continue
             val psiClass = classInfo.psiClass
             if (hasLombokData(psiClass)) {
-                // @Data 类：整个类发送
                 taskQueue.add(OptimizeTask.WholeClass(classInfo))
+                remainingTasksByClass[classInfo.className] = (remainingTasksByClass[classInfo.className] ?: 0) + 1
             } else {
-                // 普通类：按方法发送；若无方法则忽略该类
                 val methods = psiClass.methods
                 if (methods.isEmpty()) continue
                 for (method in methods) {
                     taskQueue.add(OptimizeTask.Method(classInfo, method))
+                    remainingTasksByClass[classInfo.className] = (remainingTasksByClass[classInfo.className] ?: 0) + 1
                 }
             }
         }
         
+        val totalClassesInBatch = remainingTasksByClass.size
+        val progressDialog = BatchProgressDialog(
+            project,
+            actionDesc,
+            totalClassesInBatch,
+            totalTasks
+        )
+        progressDialog.show()
+        
         fun scheduleNext() {
             val task = taskQueue.pollFirst() ?: run {
                 scheduler.shutdown()
+                ApplicationManager.getApplication().invokeLater {
+                    progressDialog.setCompleted()
+                }
                 return
             }
+            val currentClassName = when (task) {
+                is OptimizeTask.WholeClass -> task.classInfo.className
+                is OptimizeTask.Method -> task.classInfo.className
+            }
+            val currentMethodName = when (task) {
+                is OptimizeTask.WholeClass -> "整个类"
+                is OptimizeTask.Method -> task.method.name
+            }
+            remainingTasksByClass[currentClassName] = (remainingTasksByClass[currentClassName] ?: 1) - 1
+            if (remainingTasksByClass[currentClassName] == 0) {
+                remainingTasksByClass.remove(currentClassName)
+            }
+            val remainingClasses = remainingTasksByClass.size
+            val remainingMethods = taskQueue.size
+            // 当前进度 = 正在处理第几个（1-based），处理第1个时显示1，第2个时显示2
+            val currentTaskIndex = totalTasks - remainingMethods
+            
             ApplicationManager.getApplication().invokeLater {
+                progressDialog.updateProgress(
+                    currentBatchClass = currentClassName,
+                    currentRequestClass = currentClassName,
+                    currentMethod = currentMethodName,
+                    remainingClasses = remainingClasses,
+                    remainingMethods = remainingMethods,
+                    completedTasks = currentTaskIndex
+                )
                 val vf = task.virtualFile ?: run {
                     scheduler.shutdown()
                     return@invokeLater

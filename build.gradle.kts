@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.liangyonglin"
-version = "1.3.0"
+version = "1.4.0"
 
 repositories {
     maven {
@@ -55,12 +55,11 @@ tasks {
         sinceBuild.set("231")
         untilBuild.set("243.*")
         changeNotes.set("""
-            <h3>版本 1.3.0</h3>
+            <h3>版本 1.4.0</h3>
             <h4>更新内容</h4>
             <ul>
-                <li>✨ 新增「页容量」配置：支持 1-500 自定义每页类数量（如 20），持久化到本地</li>
-                <li>✨ 「扫描未提交修改」：同时扫描暂存区与工作区（蓝色）修改的 Java 文件</li>
-                <li>✨ 列表按完整类名排序后再分页，顺序稳定</li>
+                <li>✨ 批量请求进度显示：优化/注释/解释多选时弹窗展示当前类、方法、剩余数、进度条</li>
+                <li>🐛 修复当前进度计数，处理第 1 个任务时正确显示 1/N</li>
             </ul>
         """.trimIndent())
     }
