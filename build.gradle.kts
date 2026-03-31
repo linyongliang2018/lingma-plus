@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.liangyonglin"
-version = "1.5.1"
+version = "1.5.2"
 
 repositories {
     maven {
@@ -55,10 +55,10 @@ tasks {
         sinceBuild.set("231")
         untilBuild.set("243.*")
         changeNotes.set("""
-            <h3>版本 1.5.1</h3>
+            <h3>版本 1.5.2</h3>
             <h4>更新内容</h4>
             <ul>
-                <li>📝 文案调整：将“零码”统一更名为“灵码”</li>
+                <li>📝 JavaClassScanner 按钮布局：将顶部操作按钮调整为两行布局，在默认窗口宽度下即可完整显示所有按钮，无需横向拉伸</li>
             </ul>
         """.trimIndent())
     }
@@ -117,6 +117,12 @@ tasks {
 
     // 确保 runIde 也会安装插件
     named("runIde") {
+        dependsOn("installLingmaPlugin")
+    }
+
+    // IntelliJ 插件在生成 searchable options 时会读取 sandbox/plugins
+    // 需要显式声明 installLingmaPlugin 的依赖，避免 Gradle 校验失败。
+    named("buildSearchableOptions") {
         dependsOn("installLingmaPlugin")
     }
 }
