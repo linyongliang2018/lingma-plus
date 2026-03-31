@@ -15,6 +15,9 @@ class LingmaSettings {
     private var gitDaysBack: Int = 5
     private var gitAuthor: String = ""  // 空表示当前用户
     private var pageSize: Int = 20  // 分页每页类数量
+    private var optimizeCommandSuffix: String = ""
+    private var commentCommandSuffix: String = ""
+    private var customAskPrompt: String = ""
     
     init {
         loadFromCache()
@@ -28,6 +31,9 @@ class LingmaSettings {
             gitDaysBack = cached.gitDaysBack
             gitAuthor = cached.gitAuthor
             pageSize = cached.pageSize
+            optimizeCommandSuffix = cached.optimizeCommandSuffix
+            commentCommandSuffix = cached.commentCommandSuffix
+            customAskPrompt = cached.customAskPrompt
         }
     }
     
@@ -38,7 +44,10 @@ class LingmaSettings {
                 maxDelaySeconds = maxDelaySeconds,
                 gitDaysBack = gitDaysBack,
                 gitAuthor = gitAuthor,
-                pageSize = pageSize
+                pageSize = pageSize,
+                optimizeCommandSuffix = optimizeCommandSuffix,
+                commentCommandSuffix = commentCommandSuffix,
+                customAskPrompt = customAskPrompt
             )
         )
     }
@@ -54,6 +63,9 @@ class LingmaSettings {
     fun getGitDaysBack(): Int = gitDaysBack
     fun getGitAuthor(): String = gitAuthor
     fun getPageSize(): Int = pageSize.coerceIn(1, 500)
+    fun getOptimizeCommandSuffix(): String = optimizeCommandSuffix
+    fun getCommentCommandSuffix(): String = commentCommandSuffix
+    fun getCustomAskPrompt(): String = customAskPrompt
     
     fun setDelayRange(min: Int, max: Int) {
         minDelaySeconds = min
@@ -69,6 +81,17 @@ class LingmaSettings {
     
     fun setPageSize(size: Int) {
         pageSize = size.coerceIn(1, 500)
+        saveToCache()
+    }
+    
+    fun setCommandSuffixes(optimizeSuffix: String, commentSuffix: String) {
+        optimizeCommandSuffix = optimizeSuffix.trim()
+        commentCommandSuffix = commentSuffix.trim()
+        saveToCache()
+    }
+    
+    fun setCustomAskPrompt(prompt: String) {
+        customAskPrompt = prompt.trim()
         saveToCache()
     }
 }

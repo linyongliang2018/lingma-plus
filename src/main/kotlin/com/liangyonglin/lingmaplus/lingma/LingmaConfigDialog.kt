@@ -18,6 +18,9 @@ class LingmaConfigDialog(project: Project?) : DialogWrapper(project) {
     private val gitDaysField = JTextField(settings.getGitDaysBack().toString(), 10)
     private val gitAuthorField = JTextField(settings.getGitAuthor(), 20)
     private val pageSizeField = JTextField(settings.getPageSize().toString(), 10)
+    private val optimizeSuffixField = JTextField(settings.getOptimizeCommandSuffix(), 28)
+    private val commentSuffixField = JTextField(settings.getCommentCommandSuffix(), 28)
+    private val customAskPromptField = JTextField(settings.getCustomAskPrompt(), 28)
     
     init {
         title = "LingmaHelper 配置"
@@ -27,7 +30,7 @@ class LingmaConfigDialog(project: Project?) : DialogWrapper(project) {
     override fun createCenterPanel(): JComponent {
         val panel = JPanel(BorderLayout(10, 10))
         panel.border = BorderFactory.createEmptyBorder(10, 10, 10, 10)
-        panel.preferredSize = Dimension(450, 280)
+        panel.preferredSize = Dimension(620, 420)
         
         val contentPanel = JPanel()
         contentPanel.layout = BoxLayout(contentPanel, BoxLayout.Y_AXIS)
@@ -86,8 +89,44 @@ class LingmaConfigDialog(project: Project?) : DialogWrapper(project) {
         pageSizePanel.alignmentX = Component.LEFT_ALIGNMENT
         contentPanel.add(pageSizePanel)
         
+        // 自定义命令后缀配置
+        val commandLabel = JLabel("零码命令后缀（会追加在 /optimize 或 /comment 后）")
+        commandLabel.border = BorderFactory.createEmptyBorder(15, 0, 10, 0)
+        contentPanel.add(commandLabel)
+        
+        val optimizeSuffixPanel = JPanel(FlowLayout(FlowLayout.LEFT))
+        optimizeSuffixPanel.add(JLabel("优化后缀: "))
+        optimizeSuffixField.preferredSize = Dimension(420, 25)
+        optimizeSuffixField.toolTipText = "示例：保留代码原始结构，仅优化变量名"
+        optimizeSuffixPanel.add(optimizeSuffixField)
+        optimizeSuffixPanel.alignmentX = Component.LEFT_ALIGNMENT
+        contentPanel.add(optimizeSuffixPanel)
+        
+        val commentSuffixPanel = JPanel(FlowLayout(FlowLayout.LEFT))
+        commentSuffixPanel.add(JLabel("注释后缀: "))
+        commentSuffixField.preferredSize = Dimension(420, 25)
+        commentSuffixField.toolTipText = "示例：注释使用中文，保留关键英文术语"
+        commentSuffixPanel.add(commentSuffixField)
+        commentSuffixPanel.alignmentX = Component.LEFT_ALIGNMENT
+        contentPanel.add(commentSuffixPanel)
+        
+        // 自定义提示词提问
+        val customPromptLabel = JLabel("自定义提示词提问（用于批量发起同一条普通问答）")
+        customPromptLabel.border = BorderFactory.createEmptyBorder(15, 0, 10, 0)
+        contentPanel.add(customPromptLabel)
+        
+        val customAskPromptPanel = JPanel(FlowLayout(FlowLayout.LEFT))
+        customAskPromptPanel.add(JLabel("提问提示词: "))
+        customAskPromptField.preferredSize = Dimension(420, 25)
+        customAskPromptField.toolTipText = "示例：请解释这段代码的核心逻辑、边界条件和潜在风险"
+        customAskPromptPanel.add(customAskPromptField)
+        customAskPromptPanel.alignmentX = Component.LEFT_ALIGNMENT
+        contentPanel.add(customAskPromptPanel)
+        
         // 提示信息
-        val hintLabel = JLabel("<html><small>时间: ${settings.getMinDelaySeconds()}-${settings.getMaxDelaySeconds()}秒 | Git: ${settings.getGitDaysBack()}天 ${if (settings.getGitAuthor().isNotEmpty()) "作者:${settings.getGitAuthor()}" else "当前用户"} | 页容量: ${settings.getPageSize()}</small></html>")
+        val hintLabel = JLabel(
+            "<html><small>时间: ${settings.getMinDelaySeconds()}-${settings.getMaxDelaySeconds()}秒 | Git: ${settings.getGitDaysBack()}天 ${if (settings.getGitAuthor().isNotEmpty()) "作者:${settings.getGitAuthor()}" else "当前用户"} | 页容量: ${settings.getPageSize()} | 自定义后缀已启用</small></html>"
+        )
         hintLabel.border = BorderFactory.createEmptyBorder(10, 0, 0, 0)
         contentPanel.add(hintLabel)
         
@@ -143,6 +182,11 @@ class LingmaConfigDialog(project: Project?) : DialogWrapper(project) {
             settings.setDelayRange(min, max)
             settings.setGitConfig(gitDays, gitAuthor)
             settings.setPageSize(pageSize)
+            settings.setCommandSuffixes(
+                optimizeSuffix = optimizeSuffixField.text,
+                commentSuffix = commentSuffixField.text
+            )
+            settings.setCustomAskPrompt(customAskPromptField.text)
             super.doOKAction()
         } catch (e: NumberFormatException) {
             com.intellij.openapi.ui.Messages.showErrorDialog(

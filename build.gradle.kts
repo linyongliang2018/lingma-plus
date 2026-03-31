@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.liangyonglin"
-version = "1.4.1"
+version = "1.5.0"
 
 repositories {
     maven {
@@ -40,7 +40,7 @@ dependencies {
 }
 
 // 通义灵码插件的本地路径
-val lingmaPluginZipPath = "D:\\sdk\\pluginTest\\lingma-jetbrains-2.6.7.zip"
+val lingmaPluginZipPath = "D:\\sdk\\pluginTest\\tongyi-jetbrains-2.1.5.zip"
 
 tasks {
     withType<JavaCompile> {
@@ -55,10 +55,11 @@ tasks {
         sinceBuild.set("231")
         untilBuild.set("243.*")
         changeNotes.set("""
-            <h3>版本 1.4.1</h3>
+            <h3>版本 1.5.0</h3>
             <h4>更新内容</h4>
             <ul>
-                <li>🔧 增大批量进度窗口默认尺寸，进度条更易查看</li>
+                <li>✨ 支持为 <code>/optimize</code> 与 <code>/comment</code> 追加可配置“命令后缀”</li>
+                <li>✨ 新增「自定义提示词提问」：对选中方法/类批量发起同一条普通问答（纯文本发送）</li>
             </ul>
         """.trimIndent())
     }

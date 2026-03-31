@@ -22,6 +22,8 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.liangyonglin.lingmaplus.lingma.BatchProgressDialog
+import com.liangyonglin.lingmaplus.lingma.CosyChatUiAutoSender
+import com.liangyonglin.lingmaplus.lingma.CosyTaskInputBridge
 import com.liangyonglin.lingmaplus.lingma.LingmaConfigDialog
 import com.liangyonglin.lingmaplus.lingma.LingmaSettings
 import java.awt.BorderLayout
@@ -56,6 +58,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
     private val scanStagedButton = JButton("扫描未提交修改")
     private val optimizeButton = JButton("开始优化")
     private val commentButton = JButton("开始注释")
+    private val customAskButton = JButton("自定义提示词提问")
     private val configButton = JButton("配置")
     private val settingsButton = JButton("设置")
     private val progressBar = JProgressBar()
@@ -90,6 +93,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
         buttonPanel.add(scanStagedButton)
         buttonPanel.add(optimizeButton)
         buttonPanel.add(commentButton)
+        buttonPanel.add(customAskButton)
         buttonPanel.add(configButton)
         buttonPanel.add(settingsButton)
         topPanel.add(buttonPanel, BorderLayout.WEST)
@@ -118,14 +122,17 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
         val navigateMenuItem = JMenuItem("导航到类")
         val optimizeMenuItem = JMenuItem("对选中项开始优化")
         val commentMenuItem = JMenuItem("对选中项生成注释")
+        val customAskMenuItem = JMenuItem("对选中项自定义提示词提问")
         val explainMenuItem = JMenuItem("对选中项进行解释")
         navigateMenuItem.addActionListener { navigateToClass() }
         optimizeMenuItem.addActionListener { startOptimize() }
         commentMenuItem.addActionListener { startCommentGeneration() }
+        customAskMenuItem.addActionListener { startCustomPromptAsk() }
         explainMenuItem.addActionListener { explainSelectedClasses() }
         popupMenu.add(navigateMenuItem)
         popupMenu.add(optimizeMenuItem)
         popupMenu.add(commentMenuItem)
+        popupMenu.add(customAskMenuItem)
         popupMenu.add(explainMenuItem)
         
         table.addMouseListener(object : MouseAdapter() {
@@ -147,6 +154,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                     navigateMenuItem.isEnabled = hasSelection
                     optimizeMenuItem.isEnabled = hasSelection
                     commentMenuItem.isEnabled = hasSelection
+                    customAskMenuItem.isEnabled = hasSelection
                     explainMenuItem.isEnabled = hasSelection
                     popupMenu.show(table, e.x, e.y)
                 }
@@ -173,6 +181,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
         scanStagedButton.addActionListener { startScanGitStaged() }
         optimizeButton.addActionListener { startOptimize() }
         commentButton.addActionListener { startCommentGeneration() }
+        customAskButton.addActionListener { startCustomPromptAsk() }
         configButton.addActionListener { openConfig() }
         settingsButton.addActionListener { openSettings() }
         prevButton.addActionListener { goToPreviousPage() }
@@ -684,6 +693,16 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
         
         if (selectedClasses.isEmpty()) return
         
+        val settings = LingmaSettings.getInstance()
+        val minDelay = settings.getMinDelaySeconds()
+        val maxDelay = settings.getMaxDelaySeconds()
+        CosyTaskInputBridge.applyCustomSuffixByAction(
+            project = project,
+            actionId = actionId,
+            optimizeSuffix = settings.getOptimizeCommandSuffix(),
+            commentSuffix = settings.getCommentCommandSuffix()
+        )
+        
         val cosyAction = ActionManager.getInstance().getAction(actionId)
             ?: run {
                 Messages.showErrorDialog(
@@ -693,10 +712,6 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                 )
                 return
             }
-        
-        val settings = LingmaSettings.getInstance()
-        val minDelay = settings.getMinDelaySeconds()
-        val maxDelay = settings.getMaxDelaySeconds()
         
         // 统计任务数量：@Data 类 1 次，普通类按方法数；无 @Data 且无方法的类会被忽略
         var totalTasks = 0
@@ -837,6 +852,171 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
         data class Method(val classInfo: ClassInfo, val method: PsiMethod) : OptimizeTask() {
             override val virtualFile = classInfo.virtualFile
         }
+    }
+
+    private fun startCustomPromptAsk() {
+        val prompt = LingmaSettings.getInstance().getCustomAskPrompt()
+        if (prompt.isBlank()) {
+            Messages.showInfoMessage(project, "请先在配置中填写「提问提示词」", "LingmaHelper")
+            return
+        }
+        startBatchCustomAsk(prompt.trim())
+    }
+
+    private fun startBatchCustomAsk(prompt: String) {
+        val selectedViewRows = table.selectedRows
+        if (selectedViewRows.isEmpty()) {
+            Messages.showInfoMessage(project, "请先选择要处理的类", "LingmaHelper")
+            return
+        }
+        val pageSize = getPageSize()
+        val selectedClasses: List<ClassInfo> = selectedViewRows
+            .sorted()
+            .map { currentPage * pageSize + it }
+            .filter { it in allClasses.indices }
+            .map { allClasses[it] }
+        if (selectedClasses.isEmpty()) return
+
+        val settings = LingmaSettings.getInstance()
+        val minDelay = settings.getMinDelaySeconds()
+        val maxDelay = settings.getMaxDelaySeconds()
+
+        val selectionChatAction = ActionManager.getInstance().getAction("TriggerCosySelectionChatAction")
+            ?: run {
+                Messages.showErrorDialog(project, "找不到 Lingma Action（TriggerCosySelectionChatAction）", "LingmaHelper")
+                return
+            }
+        // TriggerCosySelectionChatAction 只负责打开聊天框，不会触发发送。
+        // 所以我们在打开后直接操作 UI：向 ChatInputTextArea 注入纯文本并点击发送。
+
+        var totalTasks = 0
+        for (ci in selectedClasses) {
+            totalTasks += when {
+                hasLombokData(ci.psiClass) -> 1
+                ci.psiClass.methods.isNotEmpty() -> ci.psiClass.methods.size
+                else -> 0
+            }
+        }
+        if (totalTasks == 0) {
+            Messages.showInfoMessage(project, "选中的类中没有可提问的方法", "LingmaHelper")
+            return
+        }
+
+        Messages.showInfoMessage(
+            project,
+            "将对 ${selectedClasses.size} 个类发起约 $totalTasks 次自定义提示词提问\n时间间隔: ${minDelay}-${maxDelay} 秒",
+            "LingmaHelper"
+        )
+
+        val scheduler = Executors.newSingleThreadScheduledExecutor()
+        val taskQueue = ArrayDeque<OptimizeTask>()
+        val remainingTasksByClass = mutableMapOf<String, Int>()
+        for (classInfo in selectedClasses) {
+            if (!classInfo.psiClass.isValid) continue
+            val psiClass = classInfo.psiClass
+            if (hasLombokData(psiClass)) {
+                taskQueue.add(OptimizeTask.WholeClass(classInfo))
+                remainingTasksByClass[classInfo.className] = (remainingTasksByClass[classInfo.className] ?: 0) + 1
+            } else {
+                val methods = psiClass.methods
+                if (methods.isEmpty()) continue
+                for (method in methods) {
+                    taskQueue.add(OptimizeTask.Method(classInfo, method))
+                    remainingTasksByClass[classInfo.className] = (remainingTasksByClass[classInfo.className] ?: 0) + 1
+                }
+            }
+        }
+
+        val progressDialog = BatchProgressDialog(project, "自定义提示词提问", remainingTasksByClass.size, totalTasks)
+        progressDialog.show()
+
+        fun scheduleNext() {
+            val task = taskQueue.pollFirst() ?: run {
+                scheduler.shutdown()
+                ApplicationManager.getApplication().invokeLater { progressDialog.setCompleted() }
+                return
+            }
+            val currentClassName = when (task) {
+                is OptimizeTask.WholeClass -> task.classInfo.className
+                is OptimizeTask.Method -> task.classInfo.className
+            }
+            val currentMethodName = when (task) {
+                is OptimizeTask.WholeClass -> "整个类"
+                is OptimizeTask.Method -> task.method.name
+            }
+            remainingTasksByClass[currentClassName] = (remainingTasksByClass[currentClassName] ?: 1) - 1
+            if (remainingTasksByClass[currentClassName] == 0) remainingTasksByClass.remove(currentClassName)
+            val remainingClasses = remainingTasksByClass.size
+            val remainingMethods = taskQueue.size
+            val currentTaskIndex = totalTasks - remainingMethods
+
+            ApplicationManager.getApplication().invokeLater {
+                progressDialog.updateProgress(
+                    currentBatchClass = currentClassName,
+                    currentRequestClass = currentClassName,
+                    currentMethod = currentMethodName,
+                    remainingClasses = remainingClasses,
+                    remainingMethods = remainingMethods,
+                    completedTasks = currentTaskIndex
+                )
+                val vf = task.virtualFile ?: run {
+                    scheduler.shutdown()
+                    return@invokeLater
+                }
+                val fem = FileEditorManager.getInstance(project)
+                fem.openFile(vf, true)
+                val editor = fem.selectedTextEditor ?: run {
+                    scheduler.shutdown()
+                    return@invokeLater
+                }
+                val doc = editor.document
+                val (start, end) = when (task) {
+                    is OptimizeTask.WholeClass -> task.classInfo.psiClass.textRange.let { it.startOffset to it.endOffset }
+                    is OptimizeTask.Method -> task.method.textRange.let { it.startOffset to it.endOffset }
+                }
+                val safeStart = start.coerceIn(0, doc.textLength)
+                val safeEnd = end.coerceIn(0, doc.textLength)
+                editor.selectionModel.removeSelection()
+                editor.caretModel.moveToOffset(safeStart)
+                editor.selectionModel.setSelection(safeStart, safeEnd)
+                val dataContext = DataManager.getInstance().getDataContext(editor.component)
+                val event = AnActionEvent(
+                    null,
+                    dataContext,
+                    ActionPlaces.EDITOR_POPUP,
+                    selectionChatAction.templatePresentation.clone(),
+                    ActionManager.getInstance(),
+                    0
+                )
+                // 零码的 TriggerCosySelectionChatAction 带“显示/隐藏”切换逻辑；
+                // 批量任务里如果每次都调用，会导致工具窗一会出现一会隐藏。
+                // 这里仅在工具窗不可见时才调用一次用于“拉起”聊天框。
+                val toolWindow =
+                    com.intellij.openapi.wm.ToolWindowManager.getInstance(project).getToolWindow("Code Search")
+                val needOpen = toolWindow == null || !toolWindow.isVisible
+                if (needOpen) {
+                    selectionChatAction.actionPerformed(event)
+                }
+
+                // 让零码 UI 渲染完成后，再注入文本 + 自动点击发送。
+                SwingUtilities.invokeLater {
+                    val ok = CosyChatUiAutoSender.tryAutoSend(project, prompt)
+                    if (!ok) {
+                        // 用显式全限定名，避免 Timer 类型在不同包下的解析问题
+                        javax.swing.Timer(
+                            500,
+                            java.awt.event.ActionListener {
+                                CosyChatUiAutoSender.tryAutoSend(project, prompt)
+                            }
+                        ).apply { isRepeats = false; start() }
+                    }
+                }
+            }
+            val delay = (minDelay..maxDelay).random().toLong()
+            scheduler.schedule({ scheduleNext() }, delay, TimeUnit.SECONDS)
+        }
+
+        ApplicationManager.getApplication().invokeLater { scheduleNext() }
     }
     
     private fun hasLombokData(psiClass: PsiClass): Boolean {

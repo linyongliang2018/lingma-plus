@@ -35,9 +35,24 @@ object LingmaConfigCache {
             val gitDaysBack = extractIntValue(json, "gitDaysBack")
             val gitAuthor = extractStringValue(json, "gitAuthor") ?: ""
             val pageSize = extractIntValue(json, "pageSize") ?: 20
+            val optimizeCommandSuffix = extractStringValue(json, "optimizeCommandSuffix") ?: ""
+            val commentCommandSuffix = extractStringValue(json, "commentCommandSuffix") ?: ""
+            val optimizeCustomPrompt = extractStringValue(json, "optimizeCustomPrompt") ?: ""
+            val commentCustomPrompt = extractStringValue(json, "commentCustomPrompt") ?: ""
+            val customAskPrompt = extractStringValue(json, "customAskPrompt")
+                ?: optimizeCustomPrompt.ifEmpty { commentCustomPrompt }
             if (minDelay != null && maxDelay != null && gitDaysBack != null) {
                 logger.info("已从本地加载配置: 间隔${minDelay}-${maxDelay}秒, Git${gitDaysBack}天, 页容量${pageSize}")
-                return LingmaConfigData(minDelay, maxDelay, gitDaysBack, gitAuthor, pageSize)
+                return LingmaConfigData(
+                    minDelaySeconds = minDelay,
+                    maxDelaySeconds = maxDelay,
+                    gitDaysBack = gitDaysBack,
+                    gitAuthor = gitAuthor,
+                    pageSize = pageSize,
+                    optimizeCommandSuffix = optimizeCommandSuffix,
+                    commentCommandSuffix = commentCommandSuffix,
+                    customAskPrompt = customAskPrompt
+                )
             }
         } catch (e: Exception) {
             logger.error("加载配置失败", e)
@@ -54,7 +69,10 @@ object LingmaConfigCache {
                   "maxDelaySeconds": ${data.maxDelaySeconds},
                   "gitDaysBack": ${data.gitDaysBack},
                   "gitAuthor": "${escapeJson(data.gitAuthor)}",
-                  "pageSize": ${data.pageSize}
+                  "pageSize": ${data.pageSize},
+                  "optimizeCommandSuffix": "${escapeJson(data.optimizeCommandSuffix)}",
+                  "commentCommandSuffix": "${escapeJson(data.commentCommandSuffix)}",
+                  "customAskPrompt": "${escapeJson(data.customAskPrompt)}"
                 }
             """.trimIndent()
             configFile.writeText(json)
@@ -69,7 +87,10 @@ object LingmaConfigCache {
         val maxDelaySeconds: Int,
         val gitDaysBack: Int,
         val gitAuthor: String,
-        val pageSize: Int = 20
+        val pageSize: Int = 20,
+        val optimizeCommandSuffix: String = "",
+        val commentCommandSuffix: String = "",
+        val customAskPrompt: String = ""
     )
     
     private fun escapeJson(str: String): String {
