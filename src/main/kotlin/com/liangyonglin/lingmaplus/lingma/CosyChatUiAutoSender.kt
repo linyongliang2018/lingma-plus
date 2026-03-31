@@ -8,7 +8,7 @@ import java.awt.event.MouseEvent
 import javax.swing.SwingUtilities
 
 /**
- * 打开零码聊天框后，向 ChatInputTextArea 注入“纯文本”并模拟点击发送按钮。
+ * 打开灵码聊天框后，向 ChatInputTextArea 注入“纯文本”并模拟点击发送按钮。
  * 用于“自定义提示词提问”批量自动提问。
  */
 object CosyChatUiAutoSender {

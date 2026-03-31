@@ -5,7 +5,7 @@ import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 
 /**
- * 通过反射向零码的 taskInputs 写入任务后缀文本，实现 /comment 与 /optimize 追加自定义命令。
+ * 通过反射向灵码的 taskInputs 写入任务后缀文本，实现 /comment 与 /optimize 追加自定义命令。
  */
 object CosyTaskInputBridge {
     private val logger = thisLogger()
@@ -71,7 +71,7 @@ object CosyTaskInputBridge {
                 putTaskInputs.invoke(state, key, suffix)
             }
         } catch (e: Throwable) {
-            logger.warn("写入零码 taskInputs 失败: task=$taskName", e)
+            logger.warn("写入灵码 taskInputs 失败: task=$taskName", e)
         }
     }
 

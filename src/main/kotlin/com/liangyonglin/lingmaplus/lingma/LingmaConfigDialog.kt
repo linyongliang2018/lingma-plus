@@ -90,7 +90,7 @@ class LingmaConfigDialog(project: Project?) : DialogWrapper(project) {
         contentPanel.add(pageSizePanel)
         
         // 自定义命令后缀配置
-        val commandLabel = JLabel("零码命令后缀（会追加在 /optimize 或 /comment 后）")
+        val commandLabel = JLabel("灵码命令后缀（会追加在 /optimize 或 /comment 后）")
         commandLabel.border = BorderFactory.createEmptyBorder(15, 0, 10, 0)
         contentPanel.add(commandLabel)
         

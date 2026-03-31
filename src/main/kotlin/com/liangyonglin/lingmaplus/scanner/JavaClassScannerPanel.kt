@@ -988,7 +988,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                     ActionManager.getInstance(),
                     0
                 )
-                // 零码的 TriggerCosySelectionChatAction 带“显示/隐藏”切换逻辑；
+                // 灵码的 TriggerCosySelectionChatAction 带“显示/隐藏”切换逻辑；
                 // 批量任务里如果每次都调用，会导致工具窗一会出现一会隐藏。
                 // 这里仅在工具窗不可见时才调用一次用于“拉起”聊天框。
                 val toolWindow =
@@ -998,7 +998,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
                     selectionChatAction.actionPerformed(event)
                 }
 
-                // 让零码 UI 渲染完成后，再注入文本 + 自动点击发送。
+                // 让灵码 UI 渲染完成后，再注入文本 + 自动点击发送。
                 SwingUtilities.invokeLater {
                     val ok = CosyChatUiAutoSender.tryAutoSend(project, prompt)
                     if (!ok) {

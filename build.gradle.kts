@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.liangyonglin"
-version = "1.5.0"
+version = "1.5.1"
 
 repositories {
     maven {
@@ -55,11 +55,10 @@ tasks {
         sinceBuild.set("231")
         untilBuild.set("243.*")
         changeNotes.set("""
-            <h3>版本 1.5.0</h3>
+            <h3>版本 1.5.1</h3>
             <h4>更新内容</h4>
             <ul>
-                <li>✨ 支持为 <code>/optimize</code> 与 <code>/comment</code> 追加可配置“命令后缀”</li>
-                <li>✨ 新增「自定义提示词提问」：对选中方法/类批量发起同一条普通问答（纯文本发送）</li>
+                <li>📝 文案调整：将“零码”统一更名为“灵码”</li>
             </ul>
         """.trimIndent())
     }

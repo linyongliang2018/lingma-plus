@@ -3,7 +3,7 @@ package com.liangyonglin.lingmaplus.lingma
 import com.intellij.openapi.diagnostic.thisLogger
 
 /**
- * 构建零码的 ChatAskInput，但不携带任何 tag/element，
+ * 构建灵码的 ChatAskInput，但不携带任何 tag/element，
  * 避免 UI 把文本渲染成“指令/标签”（橙色高亮）。
  */
 object CosyChatAskInputFactory {
