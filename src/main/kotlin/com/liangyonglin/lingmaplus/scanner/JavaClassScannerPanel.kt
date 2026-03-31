@@ -27,6 +27,7 @@ import com.liangyonglin.lingmaplus.lingma.CosyTaskInputBridge
 import com.liangyonglin.lingmaplus.lingma.LingmaConfigDialog
 import com.liangyonglin.lingmaplus.lingma.LingmaSettings
 import java.awt.BorderLayout
+import java.awt.GridLayout
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.util.*
@@ -87,7 +88,7 @@ class JavaClassScannerPanel(private val project: Project) : JPanel(BorderLayout(
     private fun setupUI() {
         // 顶部控制面板
         val topPanel = JPanel(BorderLayout())
-        val buttonPanel = JPanel()
+        val buttonPanel = JPanel(GridLayout(2, 4, 8, 6))
         buttonPanel.add(scanButton)
         buttonPanel.add(scanGitButton)
         buttonPanel.add(scanStagedButton)
