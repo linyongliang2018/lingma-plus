@@ -1,5 +1,22 @@
 # 更新日志
 
+## [1.5.3] - 2026-04-18
+
+### 构建与兼容性
+
+- **IntelliJ Platform Gradle Plugin 2.x**：从旧版 `org.jetbrains.intellij` 迁移至 `org.jetbrains.intellij.platform`（2.14.0），并在 `settings.gradle.kts` 中启用 `intellijPlatform.settings` 与 `defaultRepositories()`。
+- **Gradle**：Wrapper 固定为 **9.4.1**（`gradle-9.4.1-bin.zip`）；`gradlew.bat` 未设置环境变量时默认 `GRADLE_USER_HOME=D:\.gradle`。
+- **开发目标 IDE**：`intellijIdeaCommunity` **2025.2.4**，依赖 **Java 插件**（`bundledPlugin`）。
+- **插件兼容区间**：`sinceBuild=242`（最低 2024.2）至 `untilBuild=252.*`（2025.2 系列）。
+- **语言与字节码**：Kotlin **2.1.20**、`jvmTarget` **21**；JavaCompile 目标 **21**。
+- **沙箱安装 Lingma**：`installLingmaPlugin` 的目标目录改为使用 `PrepareSandboxTask.sandboxPluginsDirectory`，与 2.x 沙箱布局一致。
+
+### 版本对比
+
+- [v1.5.2…v1.5.3](https://github.com/linyongliang2018/lingma-plus/compare/v1.5.2...v1.5.3)
+
+---
+
 ## [1.5.2] - 2026-03-31
 
 ### 改进
